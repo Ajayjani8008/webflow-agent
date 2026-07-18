@@ -5,31 +5,42 @@ description: Lookup tables for Webflow builds — node types, Figma→Webflow el
 
 # Build Reference
 
-## Node types (the ONLY building blocks)
+## Node types — NATIVE MODULE FIRST (the ONLY building blocks)
 
-| Design element | WF node type | Notes |
+**Gate: before building any pattern, find its row here. A native module exists → USE IT — building a div-imitation of it = ban-sweep FAIL (agent Rule 4).** Div-blocks are for layout boxes, not for re-implementing modules Webflow ships.
+
+| Design element / pattern | WF native module | Notes |
 |---|---|---|
 | Section wrapper | `section` | |
 | Max-width wrapper | `container` | |
-| Layout box | `div-block` | |
+| Layout box (no native module fits) | `div-block` | last resort, layout only |
 | H1–H6 | `heading` + `data.tag: "h1"…"h6"` | |
 | Body text | `paragraph` | |
 | Small text / label | `text-span` | |
+| Bullet / numbered list | `list` → `list-item` | never stacked paragraphs with fake bullets |
+| Quote / testimonial text | `blockquote` | |
 | Image (incl. SVG) | `Image` | native SVG-capable — bind uploaded asset id via `set_image_asset`, real alt. No separate "SVG" element |
 | Text link | `text-link` | |
-| Block link / button | `link-block` (+ btn classes) | |
-| Navbar | `navbar` | native mobile menu built in |
-| Rich text | `richtext` | |
-| Form | `form-block` → `form-form` → inputs | never html-embed |
-| Grid | `grid` | grid-template overrides per breakpoint |
-| Video | `video` | never iframe embed |
-| Slider | `slider` → `slide` children | never html-embed |
-| Tabs | `tabs` → `tabs-menu` + `tabs-content` | never html-embed |
-| Accordion / FAQ | native `dropdown` (or div + IX2 in Designer) | never `<details>`, never height animation |
+| Block link / button | `link-block` (+ btn classes) / `button` | |
+| Navbar / any site nav | `navbar` | native mobile menu built in — never div+IX2 nav |
+| Rich text / article body | `richtext` | |
+| Form (search, newsletter, contact) | `form-block` → `form-form` → native inputs (text/textarea/select/checkbox/radio/file) | never html-embed, never fake div inputs |
+| Grid layout | `grid` | grid-template overrides per breakpoint |
+| Self-hosted / background video | `video` / background-video | never iframe embed |
+| YouTube / Vimeo | native `YouTube` / `Video` module | never iframe embed |
+| Vector/JSON animation | native `Lottie` element | never GIF fallback without asking |
+| Slider / carousel | `slider` → `slide` children | never div+IX2 carousel |
+| Tabs / segmented content | `tabs` → `tabs-menu` + `tabs-content` | |
+| Accordion / FAQ / dropdown menu | native `dropdown` (+ IX2 open/close in Designer) | never `<details>`, never height animation |
+| Image gallery / click-to-zoom | native `lightbox` | never custom modal div |
+| Search | native `search` (site search) or single-field `form-block` | |
+| Map | native `map` element | never iframe embed |
 | Symbol instance | `component` + `componentId` | |
 | CMS list | `collection-list-wrapper` → `collection-list` → `collection-item` | bind via `xattr` |
 | Divider | `divider` | horizontal only |
 | Embed (BANNED) | `html-embed` | NEVER USE |
+
+MCP builder can't create a listed module (missing type/422)? → build it in ledger as Designer step — still NEVER div-imitate it.
 
 ## Figma → Webflow element
 
@@ -112,7 +123,7 @@ LEFT/RIGHT/TOP/BOTTOM → `position: absolute` + that side `0` · CENTER → `le
 
 ## data_style_tool limitations (verified 2026-07-11)
 
-- **Rejects `-webkit-*`** → gradient-clipped text CANNOT be set via API. Native path: solid fallback color (mid-gradient hue) + ledger entry — Designer has native text-gradient picker (Text color → gradient). Never inject style.
+- **Rejects `-webkit-*` prefixed properties.** For gradient text, FIRST try the unprefixed longhands on a nested `span` inside the heading: `background-image: <gradient>` + `background-clip: text` + `color: transparent` (worked in the Encircle build — see memory [[webflow-pixel-match-method]]). Tool rejects those too → solid fallback color (mid-gradient hue) + ledger entry — Designer has native text-gradient picker (Text color → gradient). Never inject style.
 - **SVG-as-`Image` can't be recolored via CSS** (`color`/`fill` don't reach it). Need specific color → upload correctly-colored SVG or rebuild glyph natively; else Designer-polish ledger entry.
 
 ## SVG & image assets (verified 2026-07-13)
@@ -123,7 +134,7 @@ No dedicated SVG element — `Image` IS the SVG module (crisp/scalable). Inline 
 
 ## Element builder text gotcha (verified 2026-07-11)
 
-Inline `set_text` honored ONLY on `Heading`, `Paragraph`, `Button`, `TextLink`, `LinkBlock`. `TextBlock` → created as plain `Block` + placeholder String child, `set_text` silently ignored → renders "This is some text inside of a div block." Fixes: (a) prefer Paragraph/Heading; (b) read subtree, `set_text` on the **String child node id** (Block parent → "element doesn't support text"). Batch all String set_text in one call.
+Inline `set_text` honored ONLY on `Heading`, `Paragraph`, `Button`, `TextLink`, `LinkBlock`. `TextBlock` → created as plain `Block` + placeholder String child, `set_text` silently ignored → renders "This is some text inside of a div block." Fixes: (a) prefer Paragraph/Heading; (b) read subtree, `set_text` on the **String child node id** (Block parent → "element doesn't support text"); (c) text leaf needing a margin-free div: `type: "DOM"` + `set_dom_config {dom_tag:"div"}` — DOM divs take `set_text` reliably, no default `<p>` margin (verified, see [[webflow-pixel-match-method]]). Batch all String set_text in one call.
 
 ## Native form gotchas (verified 2026-07-12)
 

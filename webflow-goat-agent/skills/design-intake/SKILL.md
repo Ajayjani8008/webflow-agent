@@ -7,6 +7,19 @@ description: What to pull from a Figma file, screenshot, or pasted HTML BEFORE b
 
 Capture every value the build needs — guessing ≠ pixel-perfect. Once per section, before building. The spec produced here is pixel-verify's diff checklist — incomplete spec = blind verification.
 
+## R. RENDER FIRST (before extracting any values — every source)
+
+**The reference render is ground truth; JSON/computed values are only measurements.** Before extracting, LOOK at the section's reference image (Figma: `04-screenshots/{section}.png` from cache, or export node PNG `api.figma.com/v1/images/{fileKey}?ids={nodeId}&format=png`; screenshot: the image itself; URL: ref-cache shot). List every visual feature values may hide, and put each in the spec explicitly:
+- Per-character/word colors + gradients inside one text node (Figma `styleOverrideTable` — flat extraction reports these as one solid color; verified failure: gradient H1 read as "solid white")
+- Backdrop blur, layered/stacked shadows, opacity stacks
+- Element overlaps / negative-margin visual effects
+- True text wrap points + line counts
+- Blend effects, image treatments (duotone, overlay tints)
+
+Cross-check: every feature visible in the render must exist in the extracted spec — missing = extract deeper (node children, `styleOverrideTable`), never build without it. pixel-verify re-checks each flagged feature explicitly.
+
+**Native-module map check (same moment):** identify each UI pattern in the render → its native Webflow module (slider/carousel → Slider · tabs → Tabs · accordion/menu → Dropdown · gallery/zoom → Lightbox · video → Video/YouTube · vector anim → Lottie · quote → Blockquote · list → List · nav → Navbar · form → Form). Record in spec `elements:`. Div-imitation of an available native module = banned (agent Rule 4).
+
 ## F. Figma cache (FAST PATH — check first)
 
 Read `docs/memory/figma-cache/00-manifest.json`. `status: "cached"` → use cache, ZERO Figma calls. Missing/empty → live path (§A).

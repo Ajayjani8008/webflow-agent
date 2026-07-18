@@ -25,5 +25,5 @@ Causes 1/4/5 = Designer work, not API-fixable.
 - [2026-06] styles: MCP style_tool only programmatic style path; REST cannot create class styles.
 - [2026-06] ix2: no API exists; pre-hiding elements via class opacity:0 = blank sections.
 - [2026-06] components: API-created slider/tabs/navbar/dropdown dead until re-added in Designer.
-- [2026-06] accordion: use native <details>/<summary>, never height animation JS.
+- [2026-06→corrected 2026-07-18] accordion: native `dropdown` component (+ IX2 open/close in Designer) — NOT <details>/<summary> (not a native Webflow element; old v5 lesson was wrong). Never height-animation JS.
 - [2026-07] system: evidence = site read-back only; agent self-claims caused false "complete" reports.

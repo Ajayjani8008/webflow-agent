@@ -5,21 +5,15 @@ description: Mandatory verification loop after building each Webflow section —
 
 # Pixel Verify
 
-Run after every section build, before responsive-pass. Never skipped. Budget: 1 verify + max 2 fix passes; still failing → report remaining diffs honestly, don't loop. Automated comparison = primary evidence.
+Run after every section build, before responsive-pass. Never skipped. **Goal: the built section is visually indistinguishable from the reference, side by side — converge to ZERO visual diffs, don't stop early.** Automated comparison = primary evidence.
 
-## T. Tier selection (first — pick verify depth)
+**CONVERGENCE, NOT A FIXED CAP.** Fix passes continue as long as each pass closes ≥1 diff. Stop ONLY when: zero visual diffs (PASS), or remaining diffs are documented impossible cases, or 2 consecutive passes close nothing (STALLED → report each remaining diff + exact reason + what would resolve it). Declaring done with visible diffs = failure; the user must never have to say "retry" or "force match". Waste = re-verifying what already passed — each pass re-checks ONLY open diffs + neighbors, never the full section again.
 
-**LIGHT** when ALL true: ≤8 elements · no gradients · no absolute/sticky positioning · no form/slider/tabs/navbar · simple flex/single-column · no multi-layer shadows/per-corner radius.
-**FULL** otherwise, and ALWAYS for: section 1 of a build, hero sections, anything user flagged as off.
+## T. Depth selection (property diff only — visual compare is NEVER reduced)
 
-| Step | LIGHT | FULL |
-|---|---|---|
-| Structure read-back + ban sweep | ✓ full | ✓ full |
-| Property diff | 8-prop spot check per class | full table |
-| Screenshot compare | 1 snapshot scan | snapshot + reference side-by-side |
-| Report | condensed | full |
-
-LIGHT spot-check props: `display`/`flex-direction` · `grid-column-gap`/`grid-row-gap` · `padding-top`/`padding-bottom` · `font-size` · `font-weight` · `color` · `background-color` · width strategy (`width:100%`+`max-width`, not bare px). Any LIGHT check fails → escalate that section to FULL.
+**Side-by-side visual compare against the reference runs for EVERY section, both tiers, no exceptions.** Only the property-diff table depth varies:
+- **LIGHT** (ALL true: ≤8 elements · no gradients · no absolute/sticky · no form/slider/tabs/navbar · simple flex · no multi-layer shadows): spot-check per class — `display`/`flex-direction` · `grid-column-gap`/`grid-row-gap` · `padding-top`/`padding-bottom` · `font-size` · `font-weight` · `color` · `background-color` · width strategy. Any fail OR any visual diff → escalate to FULL.
+- **FULL** otherwise, and always for section 1, heroes, anything user flagged.
 
 ## 0. Screenshot capture
 
@@ -70,26 +64,31 @@ Per class, read back applied styles, diff value-by-value: font-family/weight/siz
 
 **Severity:** CRITICAL (wrong element/text/missing/layout direction) → must fix · MAJOR (wrong color/font-size/spacing >5px/missing shadow) → must fix · MINOR (≤1px off) → fix if budget, flag · COSMETIC (sub-pixel) → note only.
 
-## 3. Visual compare
+## 3. Visual compare (mandatory every section — the accuracy gate)
 
-Automated (primary): reference vs built snapshot, scan order §0. Human (secondary): ask user to confirm in Designer; mismatch → exact location → targeted diff. No Designer open = unconfirmed, never accept bare "looks good." Visual catches what diff misses: font rendering, color profile, image quality, balance, shadow softness, gradient smoothness.
+**Pre-check (from intake Rule 1):** the reference render was studied BEFORE building — per-char gradients, blurs, shadows, overlaps, wrap points are already in the spec. Verify each of those flagged features explicitly here; values-only diff misses them.
 
-## 4. Fix pass (batched)
+**Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node docs/memory/pixel-diff.js <reference.png> <built.png>` → prints mismatch %. **PASS line: ≥97% pixel match** (antialiasing + font-hinting tolerance built in; both images at same width first). Score < 97% → list concrete regions from the diff heatmap output → fix pass. Score can't be computed (size mismatch, blank capture) → fix the capture, never skip the score. Published-page shot (not snapshot) for the scored compare when typography is involved — snapshot lies about fonts (§0).
 
-Collect ALL diffs → ONE batched fix call → re-check changed items + 3-5 neighbors. Max 2 passes. Recurring diff after 2 = wrong property name/format for Webflow — fix format, not value. New diff introduced → revert, alternative approach. Priority: CRITICAL → MAJOR → MINOR → COSMETIC (skip if budget spent).
+**Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good." Visual catches what property diff misses: per-char styling, font rendering, color profile, image quality, balance, shadow softness, gradient smoothness.
+
+## 4. Fix pass (batched, convergent)
+
+Collect ALL diffs → ONE batched fix call → re-check ONLY changed items + 3-5 neighbors (never the whole section). Loop while each pass closes ≥1 diff; 2 consecutive no-progress passes = STALLED → report. Recurring diff across 2 passes = wrong property name/format for Webflow — fix format, not value. New diff introduced → revert, alternative approach. Priority: CRITICAL → MAJOR → MINOR → COSMETIC.
 
 Can't close: unsupported property → impossible_cases.md + alternative · API can't set → pending_designer_work.md · value right but visual wrong → Webflow rendering bug, flag to user.
 
 ## 5. Match report (mandatory, every section)
 
 ```
-PIXEL-VERIFY — [section]  tier: LIGHT|FULL  fix passes: N/2
-NATIVE       ✓ 0 embeds/custom code/style-attrs, element_builder only
+PIXEL-VERIFY — [section]  diff-depth: LIGHT|FULL  fix passes: N
+NATIVE       ✓ 0 embeds/custom code/style-attrs, native modules used, element_builder only
 STRUCTURE    ✓ N/N elements, classes, exact copy, order
 PROPERTIES   ✓ N/N → fixed: [list] · remaining: [list or none]
-VISUAL       ✓ automated PASS | human confirmed/unconfirmed
+VISUAL       pixel-score: NN.N% (≥97 = PASS) · render-features verified: [gradients/blurs/overlaps checked]
+             human: confirmed/unconfirmed
 IMPOSSIBLE   none | [list + native alternative]
-VERDICT      PASS → responsive-pass | PARTIAL → user decision | FAIL → rebuild
+VERDICT      PASS → responsive-pass | STALLED → [each diff + reason + resolution] | FAIL → rebuild
 ```
 
 NATIVE line first, must be clean — embed/style-attr never reaches PASS. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.

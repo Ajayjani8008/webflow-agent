@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.2.0
+# Webflow GOAT Agent — Backup v1.3.0
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -19,7 +19,18 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `rules/common-agents.md` | `~/.claude/rules/common/agents.md` | Platform routing — Webflow rows point to webflow-goat |
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
-After restore: `npm i ws --no-save` at `~` (screenshot/extract scripts need it) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.3.0 changes (since v1.2.0) — 99%+ accuracy upgrade (user hard rules)
+
+1. **DONE redefined:** built section must be visually indistinguishable from the reference side-by-side at every breakpoint — user never has to say "force match"/"retry".
+2. **Rule 1 RENDER IS GROUND TRUTH:** study reference PNG BEFORE building; spec must list JSON-hidden features (per-char gradients via `styleOverrideTable`, backdrop blur, layered shadows, overlaps, wrap points). New design-intake §R.
+3. **Convergent verify, not capped:** fix passes continue while each closes ≥1 diff; stop only at zero visual diffs / documented impossible / 2 no-progress passes (STALLED report). Each pass re-checks only open diffs — no full re-verify loops.
+4. **Quantified pixel score:** new `docs-memory/pixel-diff.js` (pngjs+pixelmatch, scale-normalized, AA-tolerant) — prints match % + worst regions; PASS ≥97%. Visual side-by-side now mandatory for EVERY section (v1.2.0 LIGHT-tier visual skip reverted; LIGHT now only reduces property-table depth).
+5. **MCP FIRST (Rule 5):** Webflow MCP connector always over REST; REST only when MCP absent.
+6. **NATIVE MODULE FIRST (Rule 4):** expanded node table (+List, Blockquote, YouTube, Lottie, Lightbox, Search, Map, background-video, native form inputs); div-imitation of an existing native module = ban-sweep FAIL.
+7. **Memory-verified techniques promoted into skills:** gradient text via unprefixed `background-clip: text` on nested span (try first, Designer fallback); text leaf via `DOM` + `set_dom_config`; fixed v5-era `<details>` accordion contradiction in error_learnings.md.
+8. **Extra dep:** `npm i pngjs pixelmatch --no-save` (home dir, next to `ws`).
 
 ## v1.2.0 changes (since v1.1.2) — token + time upgrade, zero accuracy loss
 
