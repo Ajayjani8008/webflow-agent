@@ -1,0 +1,18 @@
+---
+name: webflow-mcp-gotchas
+description: Webflow MCP native-build limits + reliable headless-Chrome mobile verify method
+metadata: 
+  node_type: memory
+  type: reference
+  originSessionId: fe179785-cf97-448f-a506-cfc1d4196ea2
+---
+
+Reusable traps hit building native Webflow via the MCP tools (see [[webflow-pixel-match-method]], [[webflow-help-center-build]]).
+
+- **FormTextInput placeholder is unsettable via MCP.** `set_attributes name="placeholder"` → generic "internal error"; setting via `attributes` channel → "placeholder is a reserved attribute name"; no `placeholder` key exists in the input's settings (only domId/visibility/name/required/type). Native workaround: overlay a `pointer-events:none` text element (absolute, left=icon-pad, right=kbd-pad, ellipsis) over a transparent real input. Real input stays focusable underneath.
+- **`data_element_builder` `set_text` is ignored on `TextBlock`** (comes back as generic `Block` showing the default "This is some text inside of a div block"). Use `Paragraph` for a text element that accepts `set_text` on creation.
+- **A native `Form` auto-generates** FormWrapper>FormForm>[Name label+input, Email label+input, Button] + Success + Error. To make a single search field: keep FormForm + first input, KEEP Success/Error (hidden by default). Removing the Success/Error messages in the same batch can prune the whole wrapper — leave them.
+- **`element_snapshot_tool` renders custom web-fonts as serif/fallback** even when the font IS installed on the site. Do NOT trust it for font/typography diffs — it produced a mangled serif H1 that looked like a real bug. Verify typography on the published site instead.
+- **`gap` and `border-radius` are SHORTHANDS → leak into Custom Properties panel (confirmed 2026-07-16, user-caught).** Webflow's native gap control writes `grid-column-gap`+`grid-row-gap` (even for flexbox); native radius control writes the 4 per-corner props. Setting `gap:24px` or `border-radius:14px` via data_style_tool has no native home → files under Custom Properties (violates native-only rule), even though gap/radius ARE supported natively. FIX: always `grid-column-gap`+`grid-row-gap` and `border-top-left-radius`/`border-top-right-radius`/`border-bottom-right-radius`/`border-bottom-left-radius` (all 4, even uniform). margin/padding per-side were already fine. CLAUDE.md Rule 3 shorthand list updated to include these two. Pixel-verify ban sweep must catch them.
+- **MCP has NO interaction/IX2 API (confirmed 2026-07-15).** Webflow MCP = Data (REST) + Designer (element/style) tools only. Full `webflow_guide_tool` (59KB) grepped: zero hits for interaction/ix2/animation/trigger/hover/scroll. NO IX2 can be created programmatically — not even simple ones. ALL IX2 → `pending_designer_work.md` for manual recreate. Do NOT re-investigate (token waste). Only scriptable motion = class `:hover`/`:focus` + transition longhand via `data_style_tool`. Logged in `docs/memory/impossible_cases.md`.
+- **Headless-Chrome mobile screenshots:** `--window-size=390` does NOT set the layout viewport (renders wider, then crops → false "no overflow"/wrong breakpoint). Real emulation via CDP: launch `chrome --headless=new --remote-debugging-port=P --remote-allow-origins=* --user-data-dir=<ABSOLUTE path>` (relative path → "requires a non-default data directory"), connect ws with header `Origin: http://localhost`, then `Emulation.setDeviceMetricsOverride {width,height,deviceScaleFactor:2,mobile:true}` + `Page.captureScreenshot`. Durable script: `docs/memory/webflow/shot.js` (cross-platform) — run `node shot.js <url> <out.png> <W> <H> <mobile:1|0> <port>` (needs `ws`: `npm i ws --no-save`).
