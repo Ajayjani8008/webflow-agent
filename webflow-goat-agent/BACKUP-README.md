@@ -1,6 +1,6 @@
-# Webflow GOAT Agent — Backup v1.1.2
+# Webflow GOAT Agent — Backup v1.2.0
 
-**Created:** 2026-07-16 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
+**Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
 Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **live-site URL** → Webflow via MCP). Zero custom code.
 
@@ -10,8 +10,8 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 
 | Backup path | Restore to | What it is |
 |---|---|---|
-| `CLAUDE.md` | `~/CLAUDE.md` (standalone mode) | Agent brain: rules, workflow, source routing, portable mode, source isolation, "never" list |
-| `agents/webflow-goat.md` | `~/.claude/agents/webflow/` (Claude Code agent mode) | Same brain wrapped as a Claude Code agent — use ONE of the two modes, not both |
+| `agents/webflow-goat.md` | `~/.claude/agents/webflow/` (agent mode) — or its BODY (below the frontmatter) to `~/CLAUDE.md` (standalone mode) | THE agent brain, single source of truth: rules, workflow, batching, source routing, portable mode, "never" list |
+| `CLAUDE.md` | repo/pack root only | Thin router pointing to the agent file — NOT the brain anymore (v1.2.0 dedup); do not restore as `~/CLAUDE.md` |
 | `skills/*` | `~/.claude/skills/` | 9 lazy skills: build-reference, design-intake, figma-setup, pixel-verify, responsive-pass, session-recovery, **url-intake (new)**, **custom-code-once (new)**, **webflow-help (new)** |
 | `how-to-use.md` | anywhere user-readable (also `~/docs/memory/webflow/`) | Human manual — never loaded by the agent during builds |
 | `docs-memory/*` | `~/docs/memory/webflow/` | registry.md (fresh single-file template), pending_designer_work.md, impossible_cases.md, error_learnings.md (incl. merged v5 lessons), scripts: shot.js / shot-el.js / **ref-extract.js (new)** |
@@ -20,6 +20,15 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws --no-save` at `~` (screenshot/extract scripts need it) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.2.0 changes (since v1.1.2) — token + time upgrade, zero accuracy loss
+
+1. **Dedup:** `CLAUDE.md` is now a thin router; `agents/webflow-goat.md` is the single source of truth (~5K tokens/session saved when both were loaded).
+2. **Compressed core + skills ~35-45%:** every rule stated once — detail lives in the skill that owns it (longhand → build-reference, fluid-base gate → responsive-pass, snapshot-font lie → pixel-verify). ALL verified gotchas kept verbatim in meaning.
+3. **Tiered pixel-verify:** LIGHT (simple sections — structure + ban-sweep + 8-prop spot diff + 1 snapshot) / FULL (complex, section 1, heroes). LIGHT failure auto-escalates to FULL. ~50% verify cost saved on simple sections.
+4. **Scoped figma-setup (new default):** fetch structure + variables + only in-scope sections; missing sections cache-on-fetch later. FULL prefetch only for whole-page/site builds.
+5. **Batch discipline (hard targets/section):** 1 style batch · ≤2 builder calls · 1 fix batch per pass · 1 memory write pass.
+6. **Fixed contradiction:** build-reference previously said `border-radius` shorthand "is OK" — corrected to match the verified rule: expand `gap` → `grid-column-gap`+`grid-row-gap` and `border-radius` → all 4 corner longhands.
 
 ## v1.1.2 changes (since v1.1.1)
 

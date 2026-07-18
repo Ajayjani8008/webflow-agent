@@ -1,4 +1,4 @@
-# Webflow GOAT — How To Use (v1.1.2)
+# Webflow GOAT — How To Use (v1.2.0)
 
 One agent, everything inline. You give a design source + target page, it builds pixel-perfect native Webflow. This doc = the whole manual.
 
@@ -18,7 +18,7 @@ Open the Webflow Designer on the target page first — agent builds where you're
 
 | Command | What it does | When |
 |---|---|---|
-| `/figma-setup <url>` | Caches entire Figma file locally (one time) | Start of a Figma project |
+| `/figma-setup <url>` | Caches Figma file locally (one time). Scoped by default: only the sections you're building; say "fetch everything" for the whole file | Start of a Figma project |
 | `/portable on` · `/portable off` | Raw values instead of variables → section survives copy-paste to another site | Before building a section you'll reuse cross-site |
 | `/custom-code-once` | ONE-time exception to the custom-code ban — one snippet, logged, ban restores | Only when you hard-require custom JS/CSS |
 | `/webflow-help` | Shows this cheat sheet | Anytime — costs nothing to a build |
