@@ -50,7 +50,7 @@ Source has an effect (hover, pseudo-element, keyframe, canvas, shape, filter, tr
 |---|---|---|
 | **T1 native control** | `data_style_tool` on class (incl. `pseudo: "hover"/"focus"/"active"`) | color/bg/gradient, spacing, radius, border, box-shadow, opacity, `filter`, `backdrop-filter`, `transform: translate/scale`, `transition-*`, `mix-blend-mode`, `overflow`, `object-fit`, `aspect-ratio`, `position`+offsets, `z-index` |
 | **T2 native structure** | real child element + class (visually identical, Designer-editable) | `::before`/`::after`, custom shapes, decorative overlays/glows, gradient borders, badge dots, underline swipes, masks |
-| **T3 native IX2** | Interactions timeline, Designer-only via MCP → `[critical]` ledger entry with full spec | `@keyframes`/`animation`, scroll-reveal, scroll-progress/parallax, page-load, click-toggle, marquee, infinite loops (IX2 Loop), staggered groups, SVG/Lottie vector motion |
+| **T3 native motion** | IX2 timeline (Designer-only — verified: `designer_tool` has NO interaction actions) → `[critical]` ledger click-script · OR native `Lottie` element · OR Webflow-owned GSAP registered via `data_scripts_tool` (agent-buildable end-to-end). Route via `motion-build` | `@keyframes`/`animation`, scroll-reveal, scroll-scrub/parallax, pinning, page-load, click-toggle, marquee, infinite loops, staggered groups, split-text, SVG morph, vector motion |
 | **T4 contained code** | last resort, standing-authorization set only (below) | `<canvas>` + JS animation, JS physics/particles/WebGL, cursor-tracking JS, text-scramble/typewriter JS, `clip-path` when T1 read-back fails AND no SVG path works |
 
 ### T2 recipes (the pseudo-element + shape answers)
@@ -227,6 +227,8 @@ Hover → class `:hover` + transition (portable, copies with DOM). Scroll/click/
 **Mechanics:** transition on BASE class (eases in AND out) → hover via `update_style` `pseudo: "hover"`. Transition LONGHAND (`transition-property`/`-duration`/`-timing-function`). Typical 150-250ms, `ease`/`cubic-bezier(.2,.6,.2,1)`.
 **Derived patterns:** Button → `translateY(-2px)` + stronger shadow (or `brightness(1.08)`) · Card → `translateY(-4px)` + brighter border + deeper shadow · Text link → color shift and/or arrow `translateX(3px)` · Icon/nav → opacity 0.7→1 or color shift.
 Same element type = same timing site-wide (registry `## Interactions`). Touch ignores hover — never hide essential content behind it.
+
+**Any animation work → load `motion-build`** (Motion IR, tier routing incl. Lottie + GSAP, IX2 click-scripts, `motion-verify.js` proof). The notes below are the quick-reference; motion-build is the procedure.
 
 ### Animation intake — from DESCRIPTION or REFERENCE SITE (never Figma)
 
