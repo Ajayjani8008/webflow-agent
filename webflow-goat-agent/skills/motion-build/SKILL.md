@@ -1,97 +1,102 @@
 ---
 name: motion-build
-description: Animation/interaction engine for Webflow — turn any motion reference (description, video/GIF, live URL, GSAP/CSS code, Figma prototype) into a compact Motion IR, route each animation to the cheapest tier that reproduces it exactly (CSS state / IX2 / Lottie / GSAP / bespoke), build what MCP can build, hand off the rest as an exact Designer click-script, then PROVE the motion runs with measured frames. Load only when motion is in scope.
+description: Animation/interaction engine for Webflow — turn any motion reference (description, video/GIF, live URL, GSAP/CSS code, Figma prototype) into a compact Motion IR, route each animation to the lowest native tier (class states → native Interactions powered by GSAP → Lottie → contained code for canvas only), emit an exact Designer build-script for the Interactions panel, then PROVE the motion runs with measured frames. Load only when motion is in scope.
 ---
 
 # Motion Build — the animation engine
 
-Claude reads the reference and decides WHAT the motion is. This skill decides HOW it gets into Webflow, who builds it, and how it is proven. Same contract as the rest of the pack: nothing simplified, nothing silently dropped (agent Rule 12), converge until it matches.
+Claude reads the reference and decides WHAT the motion is. This skill decides which NATIVE surface carries it, what the user clicks, and how it is proven. Nothing simplified, nothing dropped (agent Rule 13).
 
-## Hard platform facts (verified 2026-07-25 — do not re-litigate)
+## Hard platform facts (verified 2026-07-25 — do not re-litigate, do not "improve on")
 
-- **IX2 cannot be created through the API.** `designer_tool` has zero interaction actions; `INTERACTIONS` exists only as a `get_more_tools` category. Any IX2 animation is a human Designer step, forever — so the deliverable must be a click-script so exact it takes ~60s, not a paragraph of intent.
-- **Scripts ARE fully automatable.** `data_scripts_tool` can `register_hosted_script` (URL + SRI hash + version), `register_inline_script` (**max 2000 chars**), `add_page_script` / `add_site_script`, and read/write freeform head/footer blocks. So a GSAP-driven animation is end-to-end agent-buildable while a native IX2 one is not. Plan around that inversion instead of fighting it.
-- **Webflow owns GSAP** and it is free on Webflow sites — GSAP is the platform's own motion engine, not a foreign dependency. It is still code, so it stays gated (§ Tier choice) and logged.
-- Class `:hover`/`:focus`/`:active` + `transition` longhands ARE settable via `data_style_tool` — all state motion is free, native, portable, instant.
-- `@keyframes` cannot be declared by the style tool (no stylesheet surface) → keyframe motion is IX2, Lottie, or code. Never fake it with a shorthand.
+- **Webflow Interactions are natively GSAP-powered.** Webflow shipped *Interactions with GSAP* (summer 2025): a visual Interactions panel with a horizontal timeline, playhead scrubbing, live Designer preview, and **built-in ScrollTrigger, SplitText and staggers — no code, no CDN, no plugins**. This is the platform's motion engine. Sources: `webflow.com/updates/introducing-webflow-interactions-powered-by-gsap`, `webflow.com/feature/interactions-animations`, Help Center *Intro to Interactions with GSAP* / *Interactions with GSAP vs. Classic Interactions* / *interactions with GSAP glossary*.
+- **NEVER inject GSAP yourself.** No CDN `<script>`, no `register_hosted_script` for gsap/ScrollTrigger, no hand-written tween code. The engine already ships in the platform; injecting a second copy duplicates the runtime, adds weight, and produces motion that is invisible and uneditable in the Designer. Writing GSAP by hand when the panel does it = ban violation, same as any other custom code.
+- **No API surface for interactions — confirmed twice.** `designer_tool` exposes only canvas/page/breakpoint/component/selection actions, zero interaction actions. Asking Webflow's own tool registry for an INTERACTIONS capability returns *"we have shown you the full tool list."* So every timeline animation is applied by a human in the Designer. The agent's job is to make that take ~60 seconds and to verify it landed.
+- **Interactions scope to components and variants**, so motion travels with a component across pages, across sites, and through Shared Libraries. Component-scoped motion IS portable — unlike Classic Interactions, which do not copy.
+- Two systems can exist: **Interactions with GSAP** (current) and **Classic Interactions** (legacy IX2). Detect which the site has before writing a build-script (§ Panel detection).
+- Class `:hover`/`:focus`/`:active` + `transition` longhands ARE settable via `data_style_tool` — all state motion is agent-built, instant, portable.
+- `@keyframes` cannot be declared by the style tool (no stylesheet surface). Keyframe motion belongs in the Interactions panel or Lottie — never in injected CSS.
 
 ## Phase 1 — Motion intake (Claude's job: understand, then compress)
 
 **One pass over the reference. Never re-read it.** Extract per animation:
 
-`trigger` (hover/focus/click/page-load/scroll-into-view/scroll-scrub/timed-loop/mouse-move/form-state) · `target` (class, and count if a group) · `from → to` per property · `duration` · `easing` (name + bezier) · `delay` · `stagger` · `iteration` (once/N/infinite) · `direction` (normal/alternate) · `scrub range + pin` (scroll) · `threshold` (how far in view it fires) · `reduced-motion` fallback.
+`trigger` (hover/focus/click/page-load/scroll-into-view/scroll-scrub/timed-loop/mouse-move/form-state) · `target` (class or component, and count if a group) · `from → to` per property · `duration` · `easing` · `delay` · `stagger` · `iteration` (once/N/infinite) · `direction` · `scrub range + pin` · `threshold` (how far in view it fires) · `reduced-motion` fallback.
 
 Per source:
 - **Description** ("cards fade up staggered, hero text splits in") → parse to the fields above; fill unstated values from § Quality defaults and label them `derived`. Ask only when a choice changes the tier (e.g. "should the hero pin while scrolling?").
-- **Video / GIF / screen recording** → count frames for real timing (`ffprobe`/frame extraction if available): note start→end frame of each move, convert to ms; read easing from the frame spacing curve (even spacing = linear, back-loaded = ease-out). Never eyeball a duration when frames exist.
-- **Live URL** → the CSS/JS is the spec: grep stylesheets for `@keyframes`/`animation:`/`transition:`; grep JS for `gsap.`/`ScrollTrigger`/`IntersectionObserver`/`requestAnimationFrame`/`scrollY`. Record the actual numbers (durations, eases, stagger, scrub ranges), not impressions.
-- **GSAP / CSS code pasted** → read it literally; every tween, ease name, stagger and ScrollTrigger config carries over 1:1.
+- **Video / GIF / screen recording** → count frames for real timing (`ffprobe` / frame extraction when available): start→end frame per move → ms; easing from frame spacing (even = linear, back-loaded = ease-out). Never eyeball a duration when frames exist.
+- **Live URL** → the CSS/JS is the spec: grep stylesheets for `@keyframes`/`animation:`/`transition:`; grep JS for `gsap.`/`ScrollTrigger`/`IntersectionObserver`/`requestAnimationFrame`. Record real numbers (durations, eases, stagger, scrub ranges). **A reference site using GSAP-by-code is still rebuilt in the native panel** — same engine, native surface.
+- **GSAP / CSS code pasted** → read it literally; every tween, ease, stagger and ScrollTrigger config maps onto a panel control. Translate, never transplant.
 - **Figma prototype** → `get_motion_context` / prototype links: trigger, transition type, duration, easing, smart-animate pairs.
 
-**Output = Motion IR, one line per animation** (goes in the intake spec next to `effects:`):
+**Output = Motion IR, one line per animation** (in the intake spec beside `effects:`):
 
 ```
 motion:
-  M1 hover        .btn-primary        bg #1E40AF→#1D4ED8 · translateY 0→-2px   200ms ease-out              tier:CSS
-  M2 scroll-in    .card ×6            opacity 0→1 · translateY 24→0            600ms ease-out stagger 80ms once  tier:IX2
-  M3 loop         .hero__orbit        vector orbit + dash-draw                 4s linear infinite          tier:Lottie
-  M4 scroll-scrub .hero__bg           y 0→-120px                               scrub 0→100% of section, smooth .3  tier:GSAP
-  M5 canvas       #particles          180 dots drift + link <120px             rAF loop                    tier:code
+  M1 hover        .btn-primary   bg #1E40AF→#1D4ED8 · translateY 0→-2px   200ms ease-out              tier:CSS
+  M2 scroll-in    .card ×6       opacity 0→1 · translateY 24→0            600ms ease-out stagger 80ms once  tier:Interactions
+  M3 loop         .hero__orbit   vector orbit + dash-draw                 4s linear infinite          tier:Lottie
+  M4 scroll-scrub .hero__bg      y 0→-120px                               scrub over section, smooth  tier:Interactions
+  M5 split-in     .hero__title   per-word rise + fade                     500ms, 40ms stagger         tier:Interactions (SplitText)
+  M6 canvas       #particles     180 dots drift + link <120px             rAF loop                    tier:code
 ```
 
-IR is the single source of truth downstream — build, verify and report all read it. It is cheap to keep in context and it kills re-analysis.
+IR is the single source of truth for build, verify and report.
 
-## Phase 2 — Tier routing (pick the LOWEST tier that reproduces it exactly)
+## Phase 2 — Tier routing (lowest tier that reproduces it exactly)
 
-| Tier | How it ships | Use for | Agent can build alone? |
+| Tier | Surface | Use for | Who builds |
 |---|---|---|---|
-| **CSS** | `data_style_tool` `pseudo: hover/focus/active` + `transition-*` longhands on the base class | every state change: buttons, cards, links, icons, inputs, nav items | ✅ now, in the section's existing class batch |
-| **IX2** | Designer click-script (§ Phase 4) + `[critical]` ledger entry | scroll reveals, parallax, page-load sequences, click toggles, mouse-move tilt — when the project wants zero code | ❌ human clicks, agent verifies |
-| **Lottie** | `.json` asset → native `Lottie` element via `data_element_builder` | vector motion, dash-draw, morphs, icon loops, illustration loops | ✅ if the asset upload probe passes (§ Lottie probe) |
-| **GSAP** | `register_hosted_script` (pinned + SRI, once per site) + compact init in page footer, keyed to stable classes | scroll-scrub timelines, pinned sections, split-text, SVG morph, Flip layout moves, physics, precise sequencing | ✅ end-to-end, no Designer step |
-| **code** | contained embed (build-reference § Ladder T4) | `<canvas>`, WebGL, bespoke rAF | ✅ authorized set only |
+| **CSS** | `data_style_tool` `pseudo: hover/focus/active` + `transition-*` longhands | every state change: buttons, cards, links, icons, inputs, nav | ✅ agent, inside the section's existing class batch |
+| **Interactions** | native Interactions panel (GSAP-powered): timeline, ScrollTrigger, SplitText, staggers | scroll reveals, scroll-scrub/parallax, pinning, page-load sequences, click toggles, mouse-move, loops, split-text, multi-step timelines | ❌ human clicks the panel from the agent's build-script; agent verifies |
+| **Lottie** | `.json` asset → native `Lottie` element | vector illustration motion, dash-draw, morphs, icon loops | ✅ agent (probe upload once per site) |
+| **code** | contained embed (build-reference § Ladder T4) | `<canvas>`, WebGL, bespoke rAF only — no native equivalent exists | ✅ authorized set only |
 
-**Ask ONCE per project, then cache the answer in `registry.md ## Motion-Preference`:**
+**There is no "custom GSAP" tier.** Anything that would have gone there is an Interactions-panel build. If a motion seems to need hand-written GSAP, it is a panel feature you have not mapped yet — map it (§ Panel detection) before even considering code, and if it truly has no panel equivalent, log it to `impossible_cases.md` with the closest native motion. Only canvas/WebGL earns the code tier.
 
-> *"Motion delivery for this project: **IX2** (100% native, no code — you apply each scroll/load animation in the Designer from an exact 6-field click-script I generate), or **GSAP** (I build everything end-to-end, adds one pinned Webflow-owned GSAP script to the site, nothing for you to click)? Hover/state motion is native class CSS either way."*
+### Panel detection (once per site, cached to `registry.md ## Motion-Panel`)
 
-Cached preference decides IX2-vs-GSAP for every later section — never ask twice, never assume. Preserving a source that already used GSAP → GSAP path is already authorized (it is fidelity, not a new dependency). No preference recorded and the user is unreachable → IX2 (native default), and say so in the report.
+Ask the user once, plainly: *"Does this site's Interactions panel show a horizontal timeline with ScrollTrigger / SplitText / Stagger controls (Interactions with GSAP), or the older action-list panel (Classic Interactions)?"* — one screenshot of the panel answers it. Cache the answer plus the exact control labels observed, and write build-scripts in that panel's vocabulary from then on. Unknown and user unreachable → write the script for Interactions with GSAP (current default) and note the assumption.
+
+**Never invent panel labels.** The Help Center pages are fetch-blocked (403), so the first time a build-script is needed, ask the user for one screenshot of the open panel, record the real control names in `## Motion-Panel`, and reuse them forever. A build-script with invented field names costs a round trip; one screenshot costs none.
 
 ## Phase 3 — Build
 
-**CSS tier** — ride the section's existing single class batch, zero extra calls:
-transition on the BASE class (so it eases in AND out), longhand triple `transition-property` / `-duration` / `-timing-function`; state values via `update_style` with `pseudo`. Animate only `transform`/`opacity`/`filter`/`color`/`background-color`/`box-shadow`/`border-color`. Never `width`/`height`/`top`/`left`/`margin`/`padding`/`font-size` — layout thrash.
+**CSS tier** — rides the section's existing single class batch, zero extra calls: transition on the BASE class (eases in AND out), longhand triple `transition-property`/`-duration`/`-timing-function`; state values via `update_style` with `pseudo`. Animate only `transform`/`opacity`/`filter`/`color`/`background-color`/`box-shadow`/`border-color`. Never `width`/`height`/`top`/`left`/`margin`/`padding`/`font-size`.
 
-**Lottie tier** — ① probe once per site: upload the `.json` via `asset_tool`, then `data_element_builder` a `Lottie` element and set its source. Result (works / rejected + error) → `error_learnings.md`, never re-probed. ② Rejected → host the JSON as a registered script asset or fall back to the project's IX2/GSAP preference, and say which. ③ Set loop/autoplay/direction/speed via element settings; verify it plays (§ Phase 5).
+**Interactions tier** — the agent prepares everything the panel needs, then hands off:
+1. **Make the targets addressable:** every animated element carries a stable BEM class (and a component when the motion should travel). Groups that stagger must be true siblings sharing one class — the panel staggers a set, so the DOM has to present one.
+2. **Set the resting state in CSS, not as an "initial state" hack:** the element's normal class styles are its END state. The panel animates from the offset, so no permanent `opacity: 0` is baked into a class (that is what leaves content invisible when motion fails).
+3. **Prefer component scoping** when the motion belongs to a reusable block — it then travels with the component across pages/sites/Shared Libraries (§ platform facts). State that in the report.
+4. Emit the build-script (§ Phase 4). All of a page's animations in ONE handoff block.
+5. Log: `pending_designer_work.md` `[critical]` per animation (never `[optional]` — an unbuilt animation is a missing feature) + `registry.md ## Motion-Applied` once verified.
 
-**GSAP tier** — one registration per SITE, reused by every animation:
-1. `register_hosted_script` — pinned exact version URL + `integrity_hash` + semver + `display_name: "gsap-core"`; add ScrollTrigger as a second registration only if a scroll tier needs it.
-2. `add_site_script` at `footer` (site-wide, one call) — never per page, never per animation.
-3. Init code: ONE registered inline script per page (**2000-char ceiling — write it compact**, or host it) that reads the IR's animations for that page. Rules: wrap in IIFE · select by the build's real BEM classes (never `div`, never nth-child) · `gsap.matchMedia()` for breakpoint-scoped motion · `ScrollTrigger` with explicit `start`/`end`/`scrub` · guard every selector (`if (!el.length) return`) · `prefers-reduced-motion: reduce` → set end state instantly, no tweens · `ScrollTrigger.refresh()` after fonts load.
-4. Log: `registry.md ## Motion-Applied` (IR id, tier, script id, page) + `## Custom-Code-Exceptions` (script registration, why IX2 couldn't) + `pending_designer_work.md` `[optional]` review line.
-5. Layout, spacing, color, hover NEVER move into the script — those stay class styles. A GSAP script that sets static layout = ban violation.
+**Lottie tier** — ① probe once per site: upload the `.json` via `asset_tool`, build a `Lottie` element, set its source; record works/rejected + error in `error_learnings.md`, never re-probe. ② Rejected → Interactions panel or a documented impossible case. ③ Set loop/autoplay/direction/speed via element settings; verify it plays (§ Phase 5).
 
-**code tier** — build-reference § Ladder T4 containment rules, unchanged.
+**code tier** — canvas/WebGL only, build-reference § Ladder T4 containment rules unchanged.
 
-## Phase 4 — IX2 click-script (the handoff that must not cost a conversation)
+## Phase 4 — Designer build-script (the handoff that must not cost a conversation)
 
-Emit Webflow's own UI vocabulary, in order, with every field filled. One block per animation, ≤10 lines, no prose:
+One block per animation, ≤10 numbered lines, panel vocabulary from `## Motion-Panel`, every value filled — no prose, no "then configure the easing".
+
+Shape it like this (labels adjusted to the detected panel):
 
 ```
-IX2 · M2 · cards fade-up stagger
-1  Select .card (first instance) → Interactions panel → Element trigger → "While scrolling in view"
-   (scroll reveal that fires once → use "Scroll into view" instead)
-2  On "Scroll into view" → Start an animation → + New timed animation → name: "fade-up-24"
-3  Action 1: Opacity → 0%  · check "Set as initial state"
-4  Action 2: Move → Y 24px · check "Set as initial state"
-5  Action 3: Opacity → 100% · Duration 0.6s · Easing "Out Quart" · Delay 0s
-6  Action 4: Move → Y 0px  · Duration 0.6s · Easing "Out Quart" · Delay 0s  (same row time = runs together)
-7  Trigger settings: Offset 15% bottom · Limit "Once" ✓ · Smoothing n/a
-8  Apply to: "Class .card" (not "Only this element") → covers all 6, then set per-item Delay 0/80/160/240/320/400ms
-9  Reduced motion: Interactions panel → gear → "Respect reduced motion" ✓
+INTERACTIONS · M2 · cards fade-up stagger
+1  Select one .card → Interactions panel → New interaction
+2  Trigger: scroll into view · fires once · start when element is ~15% into the viewport
+3  Add tween on .card: opacity 0 → 1
+4  Add tween on .card: y 24px → 0   (same timeline position as the opacity tween — they run together)
+5  Duration 0.6s · easing ease-out (Quart-style curve) · delay 0
+6  Stagger the set: 80ms between items, order = DOM order  (do NOT hand-set 6 delays if a stagger control exists)
+7  Target the class .card / the component instance so all 6 are covered by one interaction
+8  Scrub: off (this is a timed reveal, not a scroll-linked one)
+9  Reduced motion: enable the panel's respect-reduced-motion setting
+10 Preview with the playhead, then publish
 ```
 
-Rules: exact Webflow easing names (`Out Quart`, `In Out Cubic`, `Ease`) — never raw beziers, which the panel has no field for; durations in seconds; "Set as initial state" called out explicitly on every from-value (the #1 reason a reveal flashes); `Apply to class` vs `only this element` always stated; stagger expressed as per-instance delays. All IX2 blocks for a page are emitted **together, once** — one Designer sitting, not one per section.
+Rules: durations in the panel's own unit (seconds unless it shows ms) · easing named as the panel names it, never a raw bezier the panel has no field for · say explicitly whether the animation targets **one element, a class, or a component** · express stagger with the stagger control, falling back to per-item delays only if the panel lacks one · scroll-scrub animations state start/end and smoothing · SplitText animations state the split unit (chars/words/lines) and the per-unit stagger · every page's blocks emitted together so it is one Designer sitting.
 
 ## Phase 5 — Motion verify (measured, never claimed)
 
@@ -99,43 +104,45 @@ Rules: exact Webflow easing names (`Out Quart`, `In Out Cubic`, `Ease`) — neve
 node docs/memory/webflow/motion-verify.js <url> <out.json> <W> "<selector>" <hover|click|load|scroll|all> <mobile:1|0> <port>
 ```
 
-Script bundled with this skill (`~/.claude/skills/motion-build/motion-verify.js`; copy into the project's `docs/memory/webflow/` on first use). Needs `ws` (`npm i ws --no-save` at home dir) + Chrome. Modes: `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one browser launch. Then it re-runs under `prefers-reduced-motion: reduce`.
+Bundled with this skill (`~/.claude/skills/motion-build/motion-verify.js`; copy into the project's `docs/memory/webflow/` on first use). Needs `ws` (`npm i ws --no-save` at home dir) + Chrome. `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one launch, then it re-runs under `prefers-reduced-motion: reduce`.
 
-Per element it reports: `moved` · `propsAnimated` (transform/opacity/filter **and** colour/shadow — a colour-fade hover is real motion) · `jankProps` (layout properties that changed) · **`durationDeclaredMs`** (read straight from computed `animation-duration`/`transition-duration` — EXACT) · `durationObservedMs` (proof it ran; coarse, sampling-bound) · `declared` (animation/transition strings) · `ix2` (`data-w-id` present = an interaction really is attached) · `initialStateFlash`, plus page-level `reducedMotion` and a one-line `verdict`.
+Per element: `moved` · `propsAnimated` (transform/opacity/filter **and** colour/shadow — a colour-fade hover is real motion) · `jankProps` (layout properties that changed) · **`durationDeclaredMs`** (exact, from computed `animation-duration`/`transition-duration`) · `durationObservedMs` (proof it ran; coarse) · `declared` strings · `ix2` (`data-w-id` present) · `initialStateFlash`; plus page-level `reducedMotion` and a one-line `verdict`.
 
 Gates:
-- [ ] Every IR row `moved: true` on the tier that owns it. `moved: false` on an IX2 row = the Designer step was never applied → re-surface the click-script, do NOT mark the section done
-- [ ] `jankProps` empty (only transform/opacity/filter/colour moved — never width/height/margin/padding/font-size/top/left)
-- [ ] **`durationDeclaredMs` matches the IR value exactly** where a CSS animation/transition owns the motion. Judge on declared, never on `durationObservedMs` — observed includes trigger latency and hover-out, so a correct 200ms hover can read ~500ms. Observed is only asked one question: did it move at all? (GSAP tweens set per-frame inline transforms with no declared duration → observed is the only signal there; tolerance ±40%.)
-- [ ] No `initialStateFlash` (element visible for a frame before its reveal = missing "Set as initial state")
-- [ ] `reduced-motion-respected: true`
-- [ ] Motion still correct at mobile: either scoped off deliberately (`gsap.matchMedia`/IX2 breakpoint) or verified running; parallax/scrub off below tablet by default
-- [ ] Loop animations: no layout shift per cycle, no CPU pin (frame deltas stable)
+- [ ] Every IR row `moved: true` on the tier that owns it. `moved: false` on an Interactions row = the panel step was never applied → re-surface the build-script; the section does NOT become done
+- [ ] `jankProps` empty (only transform/opacity/filter/colour moved)
+- [ ] Timing: where a CSS animation/transition owns the motion (CSS tier), **`durationDeclaredMs` must equal the IR value** — judge on declared, never observed (observed includes trigger latency and hover-out, so a correct 200ms hover reads ~500ms). **Panel-built interactions are JS-driven per-frame transforms with no declared duration** → observed is the only signal there; tolerance ±40%, and the real check is that the motion is present, smooth and un-janky
+- [ ] No `initialStateFlash` (content visible for a frame before its reveal, or stuck invisible after)
+- [ ] `reducedMotion.respected: true`
+- [ ] Mobile: motion either deliberately scoped off at that breakpoint or verified running; scrub/parallax off below tablet by default
+- [ ] Loops: no per-cycle layout shift, frame deltas stable
+- [ ] `ix2` field is informational only — Classic Interactions emit `data-w-id`; a GSAP-panel interaction may not, so **never treat a missing `data-w-id` as failure. Measured movement is the evidence.**
 
 Failure → fix at the owning tier, re-run. Two no-progress passes = STALLED, report each row with what is missing. An IR row that cannot be proven is not `built`.
 
-## Recipe library (this is where the token/time saving lives)
+## Recipe library (where the token/time saving lives)
 
-`registry.md ## Motion-Recipes` — every animation, once solved, is stored as a named recipe: `name · tier · IR line · exact build payload (class props / click-script / GSAP snippet) · verified on [date]`. Before analysing any new animation, **grep this section first** — a matching recipe is a zero-analysis, zero-decision build. Standard set to seed on first use: `fade-up-24` · `fade-in` · `stagger-cards` · `btn-lift` · `card-lift` · `link-arrow` · `nav-shrink` · `parallax-bg-120` · `count-up` · `marquee-loop` · `icon-pulse` · `hero-split-in` · `pin-scrub-section`.
+`registry.md ## Motion-Recipes` — every solved animation stored as: `name · tier · IR line · exact build payload (class props / build-script / Lottie asset) · verified on [date]`. **Grep this section before analysing any new animation** — a match is a zero-analysis build. Seed set: `fade-up-24` · `fade-in` · `stagger-cards` · `btn-lift` · `card-lift` · `link-arrow` · `nav-shrink` · `parallax-bg-120` · `count-up` · `marquee-loop` · `icon-pulse` · `hero-split-in` · `pin-scrub-section`.
 
-Consistency rule: same animation type = same duration + easing site-wide. A second, differently-timed "card reveal" is a bug, not a variant.
+Consistency: same animation type = same duration + easing site-wide. A second, differently-timed "card reveal" is a bug, not a variant.
 
 ## Quality defaults (fill unstated values, label them derived)
 
-Durations: micro-state 150-250ms · entrance 400-700ms · hero 600-900ms · loop 3-6s. Easing: entrance `ease-out` / `cubic-bezier(.2,.6,.2,1)` (Webflow `Out Quart`), exit `ease-in`, loop `ease-in-out`, scrub linear. Distance: reveal 16-32px, parallax ≤120px, lift 2-6px. Stagger: 2-3 items 100ms · 4-6 80 · 7-12 60 · >12 40, max 150. Scroll reveals fire once, threshold 10-20% in view. Max 3 animated properties per step. Always honor `prefers-reduced-motion`. Loops pause when `document.hidden`.
+Durations: micro-state 150-250ms · entrance 400-700ms · hero 600-900ms · loop 3-6s. Easing: entrance ease-out (Quart-ish), exit ease-in, loop ease-in-out, scrub linear. Distance: reveal 16-32px, parallax ≤120px, lift 2-6px. Stagger: 2-3 items 100ms · 4-6 80 · 7-12 60 · >12 40, max 150. Scroll reveals fire once, threshold 10-20% in view. Max 3 animated properties per step. Always respect reduced motion. Loops pause when the tab is hidden.
 
 ## Token & time discipline
 
-Recipe grep before analysis · one pass per reference, IR reused everywhere · CSS tier rides the existing class batch (0 extra calls) · one GSAP registration per site, one init script per page, one `add_site_script` · all IX2 blocks emitted in one handoff · motion-verify runs once per page after the single publish, `all` mode covers every trigger in one browser launch · Lottie probe once per site, cached to `error_learnings.md`.
+Recipe grep before analysis · one pass per reference, IR reused everywhere · CSS tier rides the existing class batch (0 extra calls) · panel labels learned once from one screenshot, cached · all build-scripts for a page emitted in one handoff · motion-verify runs once per page after the single publish, `all` mode covering every trigger in one browser launch · Lottie probe once per site, cached.
 
 ## Report
 
 ```
-MOTION — [page/section]   preference: IX2|GSAP (cached)
-IR rows      N total → CSS: n built · Lottie: n built · GSAP: n built · IX2: n handed off · code: n
-VERIFIED     moved n/n · jank 0 · durations ±20% ✓ · reduced-motion ✓ · mobile ✓
-IX2 PENDING  [click-script blocks, or none]
-RECIPES      reused: [names] · new: [names added to registry]
+MOTION — [page/section]   panel: Interactions-with-GSAP | Classic (cached)
+IR rows      N total → CSS: n built · Lottie: n built · Interactions: n handed off · code: n
+VERIFIED     moved n/n · jank 0 · timing ✓ · reduced-motion ✓ · mobile ✓
+PANEL WORK   [build-script blocks, or none]
+SCOPING      [component-scoped (travels) | page-level]
+RECIPES      reused: [names] · new: [names added]
 DERIVED      [values the reference didn't specify]
 ```
 

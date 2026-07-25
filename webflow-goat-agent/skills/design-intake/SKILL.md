@@ -85,12 +85,12 @@ Scan for and enumerate each occurrence:
 | `transition` `will-change` | T1 | longhand triple |
 | `::before` `::after` `content:` | **T2** | → real child element (build-reference T2 recipes) |
 | `clip-path` `mask` `-webkit-mask` | T2 | SVG asset preferred; clip-path only if read-back+render verified |
-| `@keyframes` `animation:` `animation-name` | **T3** | one IX2 timeline per keyframe set, every stop preserved, Loop for `infinite` |
+| `@keyframes` `animation:` `animation-name` | **T3** | one native Interactions timeline per keyframe set, every stop preserved, panel loop for `infinite` — never injected GSAP/CSS |
 | `<canvas>` `getContext(` `requestAnimationFrame` `WebGL` | **T4** | canvas kept as canvas — never swapped for a static image or CSS approximation |
-| `addEventListener` (scroll/mousemove/click) | T3 (T4 if not expressible) | scroll/parallax/toggle → IX2; cursor-follow physics → T4 |
+| `addEventListener` (scroll/mousemove/click) | T3 (T4 only if no panel equivalent) | scroll/parallax/scrub/toggle/mouse-move → native Interactions panel; only physics simulation → T4 |
 | `filter` `backdrop-filter` `mix-blend-mode` | T1 | check support list below |
 | `transform` | T1 translate/scale · T2 for rotate (pre-rotated SVG) | |
-| `position: sticky` `IntersectionObserver` | T1 sticky · T3 reveal | |
+| `position: sticky` `IntersectionObserver` | T1 sticky · T3 reveal (panel) | |
 | `svg` `<use` `currentColor` | asset flow | run build-reference § SVG pre-flight on every file |
 | `scroll-snap` `container-type` `@layer` `color-mix()` `@property` `:has()` | ❌ unsupported | ledger + nearest native alternative, stated to user |
 
@@ -102,12 +102,12 @@ Support: ✅ layout/type/color/spacing/border/shadow/transform(translate,scale)/
 effects:
   E1 hover  .btn-primary       bg #1E40AF→#1D4ED8 + translateY(-2px), 200ms ease   T1  → build now
   E2 pseudo .card::after       120px radial glow, blur 40, opacity .6, top -20 left -20  T2  → child .card__glow
-  E3 keyfr  float 6s infinite  translateY 0→-12→0, ease-in-out, alternate           T3  → IX2 spec (ledger)
+  E3 keyfr  float 6s infinite  translateY 0→-12→0, ease-in-out, alternate           T3  → Interactions build-script (ledger)
   E4 canvas #particles         180 dots, 0.4px/frame drift, links <120px, #2DD4BF   T4  → contained embed (authorized)
   E5 shape  .badge             pentagon clip-path polygon(...)                        T2  → SVG asset
 ```
 
-Every row ends the build as `built` / `IX2-queued` / `code-tier` / `impossible+alternative` — pixel-verify fails on any row without a status (agent Rule 12). Never merge two effects into one row; never leave an effect off the list because it looks minor.
+Every row ends the build as `built` / `interactions-queued` / `code-tier` / `impossible+alternative` — pixel-verify fails on any row without a status (agent Rule 12). Never merge two effects into one row; never leave an effect off the list because it looks minor.
 
 **C.4 Canvas capture detail** (needed to rebuild faithfully, not approximate): particle/element count, size range, speed + direction, spawn/respawn rule, colors + opacity, link/line rules + distance threshold, blend mode, background, interaction (mouse repel/attract, click spawn), fps target, DPR handling, resize behavior. Missing detail → read the JS, don't invent.
 

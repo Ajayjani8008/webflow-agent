@@ -36,12 +36,16 @@ Everything else (intake, verify, responsive, resume) = automatic.
 
 Give a reference in any form — describe it, paste a video/GIF, link a site, paste GSAP or CSS code, or point at a Figma prototype. The agent reads it, writes a one-line spec per animation, then routes each one:
 
-- **Hover/focus/active** → class styles + transition. Built instantly, nothing for you to do.
-- **Scroll reveals, parallax, page-load, click toggles** → your choice, asked once per project: **IX2** (100% native — the agent hands you an exact click-script, ~60s per animation in the Designer) or **GSAP** (Webflow's own engine — agent does everything, adds one pinned script to the site).
+- **Hover/focus/active** → class styles + transition. Agent-built instantly, nothing for you to do.
+- **Scroll reveals, scroll-scrub/parallax, pinning, page-load, click toggles, split-text, staggers** → your **native Interactions panel** (it's GSAP-powered — timeline, ScrollTrigger, SplitText and staggers are built in, no code). No API exists for it, so the agent hands you an exact build-script: numbered steps, every field value filled, all of a page's animations in one batch, ~60s each in the Designer.
 - **Vector/illustration motion** → native Lottie element, agent-built.
-- **Canvas/WebGL** → contained embed, kept as the real thing.
+- **Canvas/WebGL only** → contained embed, kept as the real thing.
 
-Then it MEASURES the result (`motion-verify.js`): did it actually move, is the duration right, is anything janky, does it respect reduced-motion, and — for IX2 — did the interaction really get attached. Unmeasured animation never counts as done. Ask for `/motion-recipes` reuse: the second time you want "cards fade up staggered", it costs no analysis.
+The agent never injects GSAP or writes tween code — the engine already ships in Webflow, and injected motion would be invisible and uneditable in your panel.
+
+First time it writes a build-script it asks for **one screenshot of your open Interactions panel** so it uses your exact control labels instead of guessing, then caches them forever. Scope motion to a component and it travels with that component across pages, sites and Shared Libraries.
+
+Then it MEASURES the result (`motion-verify.js`): did it actually move, is the timing right, is anything janky, does it respect reduced-motion. Unmeasured animation never counts as done. The recipe library means the second time you want "cards fade up staggered", it costs no analysis.
 
 **Give the agent a mobile frame.** If the Figma file has tablet/mobile frames it hunts for them and matches them exactly; with desktop only, mobile values are derived and it tells you which ones.
 

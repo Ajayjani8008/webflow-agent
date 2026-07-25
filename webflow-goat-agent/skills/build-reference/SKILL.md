@@ -50,8 +50,8 @@ Source has an effect (hover, pseudo-element, keyframe, canvas, shape, filter, tr
 |---|---|---|
 | **T1 native control** | `data_style_tool` on class (incl. `pseudo: "hover"/"focus"/"active"`) | color/bg/gradient, spacing, radius, border, box-shadow, opacity, `filter`, `backdrop-filter`, `transform: translate/scale`, `transition-*`, `mix-blend-mode`, `overflow`, `object-fit`, `aspect-ratio`, `position`+offsets, `z-index` |
 | **T2 native structure** | real child element + class (visually identical, Designer-editable) | `::before`/`::after`, custom shapes, decorative overlays/glows, gradient borders, badge dots, underline swipes, masks |
-| **T3 native motion** | IX2 timeline (Designer-only — verified: `designer_tool` has NO interaction actions) → `[critical]` ledger click-script · OR native `Lottie` element · OR Webflow-owned GSAP registered via `data_scripts_tool` (agent-buildable end-to-end). Route via `motion-build` | `@keyframes`/`animation`, scroll-reveal, scroll-scrub/parallax, pinning, page-load, click-toggle, marquee, infinite loops, staggered groups, split-text, SVG morph, vector motion |
-| **T4 contained code** | last resort, standing-authorization set only (below) | `<canvas>` + JS animation, JS physics/particles/WebGL, cursor-tracking JS, text-scramble/typewriter JS, `clip-path` when T1 read-back fails AND no SVG path works |
+| **T3 native motion** | **Native Interactions panel — GSAP-powered, no code** (timeline, ScrollTrigger, SplitText, staggers). Designer-only: verified NO API surface (`designer_tool` has zero interaction actions; Webflow's tool registry returns "full tool list" for INTERACTIONS) → `[critical]` ledger build-script · OR native `Lottie` element. Route via `motion-build`. **Never inject GSAP/tween code — the engine is already in the platform** | `@keyframes`/`animation`, scroll-reveal, scroll-scrub/parallax, pinning, page-load, click-toggle, marquee, infinite loops, staggered groups, split-text, SVG morph, vector motion |
+| **T4 contained code** | last resort, standing-authorization set only (below) | `<canvas>` + JS animation, WebGL, physics/particle simulation, `clip-path` when T1 read-back fails AND no SVG path works. **NOT** scroll-scrub, split-text, mouse-move, staggers or timelines — those are native Interactions-panel features (T3) |
 
 ### T2 recipes (the pseudo-element + shape answers)
 
@@ -68,11 +68,11 @@ Webflow has NO `::before`/`::after` control and no clip-path control in the Styl
 | **Polygon / hexagon / pentagon / arrow / blob / diagonal cut** | ① **preferred:** export the shape as SVG → `asset_tool` upload → native `Image` (exact, cross-browser, scales) — or as `background-image` on the class ② `clip-path: polygon(...)` via `data_style_tool` — allowed ONLY after read-back proves it applied AND a rendered shot proves it renders; unverified → back to ① ③ still impossible → T4 + log |
 | Rotated shape (Figma `rotation`) | pre-rotated SVG asset — class rotate is not available (see § Transform) |
 
-### T3 recipes (@keyframes → IX2)
+### T3 recipes (@keyframes → native Interactions panel)
 
-Read the `@keyframes` block → convert each stop to an IX2 timeline action on the SAME properties (transform/opacity/filter only). Infinite loop → IX2 "Loop" checkbox. Ledger spec must carry: trigger · target class · every keyframe stop (offset % → property values) · duration · easing · delay · iteration (once/infinite) · direction (normal/alternate) · stagger · reduced-motion note. Mark `[critical]` — an unbuilt animation is a missing feature, never "optional polish".
+Read the `@keyframes` block → one panel timeline, each stop a tween on the SAME properties (transform/opacity/filter/colour). Infinite → the panel's loop setting. Per-letter/word motion → SplitText control, not hand-split spans. Scroll-linked → ScrollTrigger with start/end/scrub. Build-script must carry: trigger · target class or component · every stop (offset % → values) · duration · easing · delay · iteration · direction · stagger · reduced-motion. Mark `[critical]` — an unbuilt animation is a missing feature, never "optional polish".
 
-Not expressible in IX2 (path morph, per-letter scramble, physics) → T4, stated as such in the report.
+No panel equivalent at all (WebGL, physics simulation, canvas particle systems) → T4, stated as such. Path morph, split-text and scroll-scrub ARE panel features — never route them to code.
 
 ### T4 — contained code (canvas & JS-driven only)
 
@@ -221,22 +221,22 @@ CMS: ≥3 same-structure + editor-updated + per-item image/detail page → Colle
 
 ## Interactions (native only)
 
-Hover → class `:hover` + transition (portable, copies with DOM). Scroll/click/load → native IX2, Limit: once.
+Hover → class `:hover` + transition (portable, copies with DOM). Scroll/click/load → native Interactions panel (GSAP-powered), fires once unless the design loops.
 
 **HOVER STATES ARE PART OF THE BUILD.** Figma statics don't encode hover → check source (interactive-component variant / prototype via `get_motion_context`) → none → standard derived pattern + tell user it's derived.
 **Mechanics:** transition on BASE class (eases in AND out) → hover via `update_style` `pseudo: "hover"`. Transition LONGHAND (`transition-property`/`-duration`/`-timing-function`). Typical 150-250ms, `ease`/`cubic-bezier(.2,.6,.2,1)`.
 **Derived patterns:** Button → `translateY(-2px)` + stronger shadow (or `brightness(1.08)`) · Card → `translateY(-4px)` + brighter border + deeper shadow · Text link → color shift and/or arrow `translateX(3px)` · Icon/nav → opacity 0.7→1 or color shift.
 Same element type = same timing site-wide (registry `## Interactions`). Touch ignores hover — never hide essential content behind it.
 
-**Any animation work → load `motion-build`** (Motion IR, tier routing incl. Lottie + GSAP, IX2 click-scripts, `motion-verify.js` proof). The notes below are the quick-reference; motion-build is the procedure.
+**Any animation work → load `motion-build`** (Motion IR, native tier routing, Interactions-panel build-scripts, `motion-verify.js` proof). The notes below are the quick-reference; motion-build is the procedure. Webflow Interactions are natively GSAP-powered — never inject GSAP.
 
 ### Animation intake — from DESCRIPTION or REFERENCE SITE (never Figma)
 
 Never copy reference JS/CSS — rebuild intent natively.
 **Sources:** user description → parse to `trigger + target + property + timing` (e.g. "cards fade up staggered on scroll" → scroll-into-view, opacity 0→1 + translateY 24→0, 100ms stagger, once); ask ONLY if a choice changes the build. Reference URL → WebFetch page/CSS + screenshot states → identify what/trigger/timing → replicate intent (state: approximation, not pixel copy).
-**Routing:** hover/focus/active/state → class + transition via style tool → **buildable now**. Scroll-reveal/scroll-progress/page-load/click-toggle/mouse-parallax → **IX2 = Designer-only via MCP** → exact spec to pending_designer_work.md: trigger, target, from→to, duration, easing, delay, stagger, Limit: once, reduced-motion note. Never fake IX2 with embeds.
+**Routing:** hover/focus/active/state → class + transition via style tool → **buildable now**. Scroll-reveal/scroll-scrub/page-load/click-toggle/mouse-parallax/split-text → **native Interactions panel = Designer-only, no API** → exact build-script to pending_designer_work.md: trigger, target class/component, from→to, duration, easing, delay, stagger, iteration, reduced-motion. Never fake it with embeds and never hand-write GSAP.
 **Quality defaults:** animate ONLY transform/opacity/filter, max 3 props (never width/height/top/left/margin/padding/font-size — jank). Durations: UI 150-300ms, entrances 400-700, hero 600-900. Easing: entrances `ease-out`/`cubic-bezier(.2,.6,.2,1)`, loops `ease-in-out`. Stagger: 2-3 items 100ms · 4-6 80 · 7-12 60 · >12 40; max 150. Scroll reveals Limit: once. Respect `prefers-reduced-motion`. Intensity per user (subtle ↔ high), state which applied.
-**Report split every time:** applied NOW (T1 hover/state) vs T2 structure built vs queued T3 IX2 specs vs T4 contained code — nothing silently missing. Effect no tier can reach → impossible_cases.md + nearest alternative, stated plainly.
+**Report split every time:** applied NOW (T1 hover/state) vs T2 structure built vs queued T3 Interactions build-scripts vs T4 contained code — nothing silently missing. Effect no tier can reach → impossible_cases.md + nearest alternative, stated plainly.
 
 ## Impossible cases
 
@@ -267,7 +267,7 @@ DELETE /v2/sites/{site_id}/pages/{page_id}/elements/{id}
 
 ## Portability traps (cross-site copy)
 
-Copies with DOM: structure, text, static image URLs, class styles incl. `:hover` transitions. Does NOT copy: IX2 (project DB) · slider/tabs/navbar init (`w-*` Designer-assigned) → dead shells until re-init → status `partial` + ledger · CMS bindings (ids differ) · Symbols (site-specific ids). Multi-site build → prefer `:hover` over IX2, document IX2 specs in registry for recreate. Custom-code "portable" workarounds banned.
+Copies with DOM: structure, text, static image URLs, class styles incl. `:hover` transitions. Does NOT copy: Classic Interactions (project DB) — but **native Interactions scoped to a component DO travel with that component across pages, sites and Shared Libraries**, so scope reusable motion to components · slider/tabs/navbar init (`w-*` Designer-assigned) → dead shells until re-init → status `partial` + ledger · CMS bindings (ids differ) · Symbols (site-specific ids). Multi-site build → prefer `:hover` for state motion and component-scoped Interactions for the rest; document every build-script in registry for recreate. Custom-code "portable" workarounds banned.
 
 ## Error recovery
 

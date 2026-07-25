@@ -1,4 +1,4 @@
-# Webflow Routing (v1.5 — GOAT agent system)
+# Webflow Routing (v1.6 — GOAT agent system)
 
 ALL Webflow work — any size, any source (Figma / screenshot / HTML / live URL / description) — is handled by the **webflow-goat** agent (`~/.claude/agents/webflow/webflow-goat.md`) or done inline following its rules. It works end-to-end inline: intake → build → pixel-verify → responsive-pass.
 

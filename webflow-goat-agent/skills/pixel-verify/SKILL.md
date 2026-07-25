@@ -87,7 +87,7 @@ Walk the intake `effects:` manifest row by row. Every row must resolve to exactl
 |---|---|
 | `built` (T1) | style read-back shows the property on the class/pseudo-state, values match |
 | `built` (T2) | the real child element exists with its class + styles; rendered shot shows the effect |
-| `IX2-queued` (T3) | full spec in pending_designer_work.md marked `[critical]` — trigger, all keyframe stops, duration, easing, loop, stagger |
+| `interactions-queued` (T3) | full build-script in pending_designer_work.md marked `[critical]` — trigger, target class/component, all stops, duration, easing, loop, stagger; native Interactions panel (no injected GSAP) |
 | `code-tier` (T4) | embed present + registry `## Custom-Code-Exceptions` entry + it actually animates in the published page |
 | `impossible` | impossible_cases.md entry + the native alternative that shipped, named in the report |
 
@@ -132,7 +132,7 @@ CONTENT      ✓ 0 placeholders · N/N strings verbatim · N/N images real asset
 ICONS/SVG    ✓ N/N bound by asset id, viewBox, sized, 200 OK, non-zero at all breakpoints
 STRUCTURE    ✓ N/N elements, classes, exact copy, order
 PROPERTIES   ✓ N/N → fixed: [list] · remaining: [list or none]
-EFFECTS      N/N manifest rows resolved — built: E1,E2 · IX2-queued: E3 · code-tier: E4 · impossible: none
+EFFECTS      N/N manifest rows resolved — built: E1,E2 · interactions-queued: E3 · code-tier: E4 · impossible: none
 VISUAL       pixel-score: NN.N% (≥97 = PASS) · render-features verified: [gradients/blurs/overlaps checked]
              human: confirmed/unconfirmed
 IMPOSSIBLE   none | [list + native alternative]
