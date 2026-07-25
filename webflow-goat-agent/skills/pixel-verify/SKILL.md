@@ -47,7 +47,51 @@ MCP: `element_snapshot_tool` / `data_element_tool` get. API: `GET /v2/pages/{id}
 - [ ] Built via `data_element_builder`, not `data_whtml_builder`
 - [ ] No data-* attributes for styling
 
-Any hit = build void regardless of visual match. Delete, rebuild native, restart verify. **Sole whitelist:** snippet logged in registry.md `## Custom-Code-Exceptions` (user-authorized `/custom-code-once`) — exact match only, never "similar."
+Any hit = build void regardless of visual match. Delete, rebuild native, restart verify. **Whitelist (exact match only, never "similar"):** ① snippet logged in registry.md `## Custom-Code-Exceptions` via user-invoked `/custom-code-once` ② a **T4 effect from the intake manifest** (canvas/JS-driven only, per build-reference § Effect Fidelity Ladder T4) with its registry log present. A T4 hit that is NOT in the manifest, or carries layout/spacing/typography/color/hover CSS, or has no registry entry → still an instant FAIL.
+
+## 1.5 CONTENT GATE — zero placeholders (deterministic, run every section)
+
+Read every text node + image binding in the built subtree and FAIL on any hit:
+
+- [ ] **Webflow default strings:** `This is some text inside of a div block` · `Heading` (bare) · `Button Text` · `Name`/`Email` bare labels on styled forms · `Lorem ipsum` (any case) · `Tab Link 1` · `List Item` · `Untitled`
+- [ ] **Agent-invented filler:** any string not present in the intake spec / source. Diff built text ↔ spec text as SETS — extra string = invented, missing string = omitted content. Both FAIL
+- [ ] **Verbatim check:** each string character-for-character vs source (punctuation, casing, `&`, dashes, superscripts, non-breaking spaces). Re-worded, shortened, or "cleaned up" copy = FAIL
+- [ ] **Images:** every `Image` bound to an uploaded asset id — no Webflow placeholder asset (`placeholder.*.svg`), no `example.com`, no random stock, no hotlinked source URL
+- [ ] **Alt text:** real and specific per image (from source), never empty on content images, never the filename
+- [ ] **Counts:** N text nodes / N images in reference == N built (a dropped list item or missing eyebrow line is an omission, Rule 12)
+
+Placeholder allowed ONLY where the user explicitly said so — logged in the spec `unknowns` as user-approved.
+
+## 1.6 ICON / SVG AUDIT (every section with vector assets — the "broken icons" gate)
+
+Per `Image` element carrying an SVG:
+
+- [ ] Bound via `set_image_asset` **asset id** — never `src` attribute / raw CDN URL
+- [ ] Asset URL returns HTTP 200 (`curl -sI` or fetch); 403/404 → re-upload
+- [ ] Source file has `viewBox` (build-reference § SVG pre-flight) — missing = collapses or won't scale
+- [ ] Class sets explicit size (`width`+`height`, or `width:100%`+`max-width`) — never size-less
+- [ ] `flex-shrink: 0` when inside a flex row (else squashed to 0 on narrow viewports)
+- [ ] Colors baked in the file (no `currentColor`, no CSS-dependent fill) and match the reference hex
+- [ ] No `<style>`/`<script>`/`<foreignObject>`/external `<use>` inside; internal ids unique per file
+- [ ] **Rendered box non-zero at EVERY breakpoint** (snapshot per breakpoint; 0×0 or 300×150 default = broken)
+- [ ] Count matches the reference exactly — no missing, no duplicated icon
+- [ ] Visually correct in the shot: right glyph, not a black square, not clipped by parent `overflow: hidden`, not invisible on same-color bg
+
+Any fail → fix at source (re-export/repair SVG → re-upload → re-bind), never by adding CSS hacks. Log unrepairable cases (e.g. gradient-stroke icon) to impossible_cases.md with the chosen fallback.
+
+## 1.7 EFFECT COMPLETENESS GATE (anti-simplification, Rule 12)
+
+Walk the intake `effects:` manifest row by row. Every row must resolve to exactly one:
+
+| Status | Evidence required |
+|---|---|
+| `built` (T1) | style read-back shows the property on the class/pseudo-state, values match |
+| `built` (T2) | the real child element exists with its class + styles; rendered shot shows the effect |
+| `IX2-queued` (T3) | full spec in pending_designer_work.md marked `[critical]` — trigger, all keyframe stops, duration, easing, loop, stagger |
+| `code-tier` (T4) | embed present + registry `## Custom-Code-Exceptions` entry + it actually animates in the published page |
+| `impossible` | impossible_cases.md entry + the native alternative that shipped, named in the report |
+
+Row with no status, or an effect visible in the reference that never entered the manifest → FAIL (go back to intake, extend the manifest, build it). "Simplified", "close enough", "skipped for now" are not valid statuses.
 
 ## 2. Property diff (FULL tier — LIGHT uses spot-check list from §T)
 
@@ -83,15 +127,19 @@ Can't close: unsupported property → impossible_cases.md + alternative · API c
 ```
 PIXEL-VERIFY — [section]  diff-depth: LIGHT|FULL  fix passes: N
 NATIVE       ✓ 0 embeds/custom code/style-attrs, native modules used, element_builder only
+             (authorized T4: [none | list + registry logged])
+CONTENT      ✓ 0 placeholders · N/N strings verbatim · N/N images real assets + alt
+ICONS/SVG    ✓ N/N bound by asset id, viewBox, sized, 200 OK, non-zero at all breakpoints
 STRUCTURE    ✓ N/N elements, classes, exact copy, order
 PROPERTIES   ✓ N/N → fixed: [list] · remaining: [list or none]
+EFFECTS      N/N manifest rows resolved — built: E1,E2 · IX2-queued: E3 · code-tier: E4 · impossible: none
 VISUAL       pixel-score: NN.N% (≥97 = PASS) · render-features verified: [gradients/blurs/overlaps checked]
              human: confirmed/unconfirmed
 IMPOSSIBLE   none | [list + native alternative]
 VERDICT      PASS → responsive-pass | STALLED → [each diff + reason + resolution] | FAIL → rebuild
 ```
 
-NATIVE line first, must be clean — embed/style-attr never reaches PASS. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.
+NATIVE / CONTENT / ICONS / EFFECTS lines are hard gates and come first — an unauthorized embed, one placeholder string, one broken icon, or one unresolved effect row never reaches PASS regardless of pixel score. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.
 
 ## 6. Edge cases
 

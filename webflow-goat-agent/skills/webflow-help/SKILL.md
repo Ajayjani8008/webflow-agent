@@ -30,7 +30,9 @@ Everything else (intake, verify, responsive, resume) = automatic.
 
 ## Rules that affect you
 
-1. Never guesses — asks once when a value matters. 2. Zero custom code (door: /custom-code-once). 3. Every section proven vs design before "done". 4. IX2/slider-init/Symbols = Designer-only → lands in `pending_designer_work.md`, status "partial". 5. One source per build (Figma tools never mix with URL tools). 6. Crash → new session → say "resume".
+1. Never guesses — asks once when a value matters. 2. Native ladder, not "no effects": hover/filters = class styles · `::before`/`::after`/shapes = real child elements · `@keyframes`/scroll/load = IX2 spec you apply in Designer · canvas/JS-driven = contained embed, logged. Nothing gets simplified or dropped; other custom code still needs `/custom-code-once`. 3. Every section proven vs design before "done" — pixel-score ≥97% at desktop AND at each breakpoint that has a mobile/tablet frame. 4. Real content only — no lorem, no placeholder copy, no substituted images. 5. IX2/slider-init/Symbols = Designer-only → `pending_designer_work.md`, status "partial". 6. One source per build (Figma tools never mix with URL tools). 7. Crash → new session → say "resume".
+
+**Give the agent a mobile frame.** If the Figma file has tablet/mobile frames it hunts for them and matches them exactly; with desktop only, mobile values are derived and it tells you which ones.
 
 ## Quick fixes
 

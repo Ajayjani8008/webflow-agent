@@ -46,7 +46,7 @@ Output = same spec format as live path — downstream skills don't care about th
 5. **Radius** — per element, per-corner if uneven; ellipse → 50%
 6. **Effects** — shadow x/y/blur/spread/color inner/outer; layer blur; backdrop blur; visibility toggles
 7. **Borders** — width/style/color, per side; border align
-8. **Constraints/responsive** — pins/stretch; rotation, z-index, mix-blend, visibility; tablet/mobile frames → read their values (never invent specified responsive)
+8. **Constraints/responsive** — pins/stretch; rotation, z-index, mix-blend, visibility. **MANDATORY RESPONSIVE-FRAME HUNT (never skip, never assume "desktop only"):** before building, search the file for this section's tablet/mobile counterparts — ① sibling/nearby frames whose name contains `mobile|Mobile|tablet|Tablet|sm|md|375|390|414|428|768|834|iPhone|iPad` ② frames with `absoluteBoundingBox.width` in 320-480 (mobile) / 700-900 (tablet) ③ a mobile PAGE in the file (check page list once) ④ variant of the same component with a breakpoint property. Found → cache each as `03-nodes/{section}--mobile.json` + `04-screenshots/{section}--mobile.png` and extract ALL properties (padding ×4, gaps, margins, alignment, order, font sizes, widths, hidden/shown elements, image crops) — these are exact, never derived. Not found after the hunt → record `responsive: none in design → derived` and say so in the report. Guessing mobile values while a mobile frame exists in the file = build failure.
 9. **Images/icons** — every image + SVG; decorative vs content; export node ids; fill mode, crop
 10. **Components/variants** — repeats (Symbol ≥2×, CMS ≥3× editorial); variant states (hover/active/open); component props
 11. **Interactions** — prototype links, hover variants, transitions (type, easing, duration, trigger)
@@ -64,17 +64,62 @@ Extract measurable, flag rest with mandatory confidence:
 
 Every assumption tagged: `assuming 24px gap [MEDIUM]` → `unknowns`. **MEDIUM/LOW affecting layout = explicit user confirmation required**; text-only MEDIUM proceeds after one reminder. Image <1200px wide → ask higher res. Text in image → ask actual copy, don't OCR low-res. Gradients → ask tokens.
 
-## C. Pasted HTML/CSS
+## C. Pasted HTML/CSS — recreate it ALL, nothing simplified
 
-Ground truth, never embed material:
-1. Tag → native Webflow element (build-reference table); DOM = element tree
-2. CSS values → class styles exactly
-3. CSS custom properties → Webflow variables, same role
-4. `@media` → breakpoint overrides for responsive-pass
-5. Script-driven → native equivalent (IX2, native slider/tabs/dropdown, `:hover`) or out-of-scope; pasted `<script>`/`<style>` NEVER enters the site
-6. Property support check: ✅ layout/type/color/spacing/border/shadow/transform(translate,scale)/transition · ⚠️ clip-path (basic), filter (blur/grayscale/opacity), backdrop-filter (blur) · ❌ scroll-snap, scroll-behavior, overscroll-behavior, contain, container-type, @layer, @scope, nesting, color-mix(), light-dark(), @property → ledger + nearest native alternative
+The HTML file is the contract. Every interactive and visual effect in it must exist in the Webflow build — at its ladder tier (build-reference § Effect Fidelity Ladder), never dropped, never "approximated". Omission is the #1 failure of HTML→Webflow work.
+
+**C.1 Structure & values**
+1. Tag → native Webflow element (build-reference node table); DOM = element tree. Pattern that maps to a native module (slider/tabs/dropdown/lightbox/form/nav) → that module, even if the HTML hand-rolled it with divs+JS
+2. CSS values → class styles exactly, longhand (**read the FULL stylesheet, incl. `<style>` blocks, `@media`, `:root`** — never style off the HTML alone)
+3. CSS custom properties → Webflow variables, same names/roles
+4. `@media` → breakpoint overrides handed to responsive-pass (source-specified, not derived)
+5. Real copy, real images: every text string and asset comes from the file (§ Content fidelity)
+
+**C.2 EFFECT SWEEP (mandatory — grep the CSS/JS, list every hit)**
+
+Scan for and enumerate each occurrence:
+
+| Grep for | Ladder tier | Notes |
+|---|---|---|
+| `:hover` `:focus` `:active` `:focus-visible` | T1 | pseudo-state via style tool + transition on base class |
+| `transition` `will-change` | T1 | longhand triple |
+| `::before` `::after` `content:` | **T2** | → real child element (build-reference T2 recipes) |
+| `clip-path` `mask` `-webkit-mask` | T2 | SVG asset preferred; clip-path only if read-back+render verified |
+| `@keyframes` `animation:` `animation-name` | **T3** | one IX2 timeline per keyframe set, every stop preserved, Loop for `infinite` |
+| `<canvas>` `getContext(` `requestAnimationFrame` `WebGL` | **T4** | canvas kept as canvas — never swapped for a static image or CSS approximation |
+| `addEventListener` (scroll/mousemove/click) | T3 (T4 if not expressible) | scroll/parallax/toggle → IX2; cursor-follow physics → T4 |
+| `filter` `backdrop-filter` `mix-blend-mode` | T1 | check support list below |
+| `transform` | T1 translate/scale · T2 for rotate (pre-rotated SVG) | |
+| `position: sticky` `IntersectionObserver` | T1 sticky · T3 reveal | |
+| `svg` `<use` `currentColor` | asset flow | run build-reference § SVG pre-flight on every file |
+| `scroll-snap` `container-type` `@layer` `color-mix()` `@property` `:has()` | ❌ unsupported | ledger + nearest native alternative, stated to user |
+
+Support: ✅ layout/type/color/spacing/border/shadow/transform(translate,scale)/transition/filter/backdrop-filter/aspect-ratio · ⚠️ clip-path (verify read-back), `mix-blend-mode` (multiply/screen/overlay) · ❌ scroll-snap, scroll-behavior, overscroll-behavior, contain, container-type, @layer, @scope, nesting, color-mix(), light-dark(), @property, `:has()`
+
+**C.3 Output — numbered effect manifest (goes in the spec, drives verify)**
+
+```
+effects:
+  E1 hover  .btn-primary       bg #1E40AF→#1D4ED8 + translateY(-2px), 200ms ease   T1  → build now
+  E2 pseudo .card::after       120px radial glow, blur 40, opacity .6, top -20 left -20  T2  → child .card__glow
+  E3 keyfr  float 6s infinite  translateY 0→-12→0, ease-in-out, alternate           T3  → IX2 spec (ledger)
+  E4 canvas #particles         180 dots, 0.4px/frame drift, links <120px, #2DD4BF   T4  → contained embed (authorized)
+  E5 shape  .badge             pentagon clip-path polygon(...)                        T2  → SVG asset
+```
+
+Every row ends the build as `built` / `IX2-queued` / `code-tier` / `impossible+alternative` — pixel-verify fails on any row without a status (agent Rule 12). Never merge two effects into one row; never leave an effect off the list because it looks minor.
+
+**C.4 Canvas capture detail** (needed to rebuild faithfully, not approximate): particle/element count, size range, speed + direction, spawn/respawn rule, colors + opacity, link/line rules + distance threshold, blend mode, background, interaction (mouse repel/attract, click spawn), fps target, DPR handling, resize behavior. Missing detail → read the JS, don't invent.
 
 ## U. Live URL → STOP, load `url-intake` (own skill, own cache). Nothing further here.
+
+## CF. Content fidelity — real content only, zero placeholders
+
+**Every string, number, label and image in the build comes from the source.** No lorem ipsum, no "Heading", no "Button Text", no stock swap-ins, no invented microcopy, no truncation, no "…" shortening, no re-worded headlines, no reordered list items. Applies to visually-hidden text too (alt text, aria-labels, form labels, button labels, nav items, legal lines, badge/eyebrow text).
+
+Capture per section: every text node verbatim (incl. punctuation, casing, `&`/`—`, line breaks, superscripts) into the spec `elements:` rows · every image/icon exported and uploaded (never hotlink, never substitute) · alt text from the design/HTML, else a real description of that specific image.
+
+Source genuinely has no content for a slot (empty Figma placeholder, `TODO` in HTML) → ask once, list it in `unknowns`, and build only after the user supplies it or explicitly says "use placeholder here". Placeholder text the agent invented on its own = pixel-verify instant FAIL (pixel-verify § Content gate).
 
 ## D. Assets — always
 
@@ -98,13 +143,15 @@ elements:
   1 H1  "exact copy"  family/size/weight/lh/ls/color  [font-validated]
   2 img [asset → uploaded id]  w×h, radius, object-fit
 colors: var(--x) | #hex (new → propose var) · gradients stops+angle
-effects: shadows/blurs/borders per element
-assets: [uploaded list]
+effects:   [NUMBERED manifest — E1…En, each: type · target · exact values · tier T1-T4 · status]
+           (static shadows/blurs/borders per element included as T1 rows)
+assets: [uploaded list — each: file, asset id, viewBox ✓, baked color, class size]
 interactions: [list | none]
-responsive: [values from design | none → standard patterns, flagged]
+responsive: mobile-frame: [node id | NONE after hunt] · tablet-frame: [node id | NONE]
+           [exact per-breakpoint values from those frames | derived + flagged]
 impossible: [list + alternatives | none]
 unknowns: [assumed values + confidence — confirm before build]
-validation: fonts|colors|spacing|elements ✓
+validation: fonts|colors|spacing|elements|content-verbatim|svg-preflight|effect-manifest ✓
 ```
 
 `unknowns` non-empty + matters → ask before building. Any validation failed → fix first.

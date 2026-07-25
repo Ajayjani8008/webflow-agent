@@ -21,6 +21,8 @@ Everything lands in `docs/memory/webflow/ref-cache/{domain}/`. Before any live f
 6. **Value normalization:** computed values can be fractional (`15.98px` from rem/viewport math) → round to the obvious design value (16px) and note it; prefer the rootVars token value when one matches. `line-height` comes back in px → convert to unitless/em if the token system uses it.
 7. **Assets:** every `img src` in the extract → download → upload via `asset_tool`, use returned URL (never hotlink). Inline SVGs flagged `svg:true` → grab `outerHTML` via the same CDP route or ask user for files.
 8. **What extraction CANNOT see:** hover/scroll/load animations (JS-driven), exact font files (only family names — validate via `data_fonts_tool`, ask user to install), content behind interaction (open menus, sliders). Hover states not extractable → observe/ask → route through the Animation intake path.
+9. **Effect sweep (same manifest as design-intake §C.2/C.3):** pull the page's stylesheets + inline `<style>` (`curl` the `<link rel=stylesheet>` hrefs) and grep for `:hover` · `::before`/`::after`/`content:` · `@keyframes`/`animation:` · `clip-path`/`mask` · `<canvas>`/`getContext(`/`requestAnimationFrame` · `filter`/`backdrop-filter`/`mix-blend-mode`. Each hit → numbered `effects:` row with its ladder tier (build-reference § Effect Fidelity Ladder). Computed styles alone never reveal pseudo-elements or keyframes — the stylesheet does. Third-party site → structure/effects only, never its copy or brand assets.
+10. **Content:** copy and images come from the source only when it is the user's own site/design; third-party reference → user supplies real content. Never lorem, never invented microcopy (agent Rule 13).
 
 ## Validation + spec (same contract as design-intake)
 

@@ -5,7 +5,9 @@ description: ONE-TIME user-authorized exception to the Webflow custom-code ban. 
 
 # Custom Code — One-Time Exception
 
-The GOAT hard ban on custom code (Rule 3) stays the default forever. This skill is the single, narrow, user-controlled exception. It exists so a hard user requirement doesn't dead-end — not to soften the ban.
+The GOAT code ban (Rule 4) stays the default forever. This skill is the narrow, user-controlled exception for anything **outside** the ladder's T4 set. It exists so a hard user requirement doesn't dead-end — not to soften the ban.
+
+**Not this skill's job:** effects that already have a tier on the Effect Fidelity Ladder (build-reference). `::before`/`::after`, shapes/clip-path, `@keyframes`, hover — those are T1/T2/T3 native builds; reaching for code there is a violation, not an exception. Canvas/JS-driven animation is T4 under the user's standing "preserve the HTML effects" instruction — build it per the ladder's containment rules and log it, no invocation needed. Everything else (custom CSS hacks, third-party scripts, JS to fake a native module) still requires the protocol below.
 
 ## Trigger — user only, never agent
 

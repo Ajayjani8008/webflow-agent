@@ -29,6 +29,25 @@ Any unchecked → fix BASE class at Desktop → re-run pixel-verify → then pro
 - Design has tablet/mobile frames (intake `responsive:` filled) → exact values, ALL properties (layout, spacing, images, colors — not just type)
 - Desktop-only design → standard patterns below + **tell user exactly which values were derived**
 
+**Frame hunt is not optional.** intake `responsive: mobile-frame: NONE` is only acceptable if the hunt in design-intake §A.8 actually ran (name patterns, width ranges 320-480 / 700-900, mobile page in file, component variants). Deriving mobile values while a mobile frame sits in the Figma file = build failure. Not run yet → run it now, before applying a single override.
+
+### 2.1 Spacing diff table (mobile frame present — the #1 mobile-accuracy gap)
+
+Mobile mismatches are almost never "the layout broke" — they are spacing drift. Build an explicit per-class table from the mobile frame and diff after applying, same rigor as desktop property diff:
+
+| Per class @ breakpoint | From mobile frame | Applied | Δ |
+|---|---|---|---|
+| `padding-top/right/bottom/left` | exact px | read-back | ±0.5px tolerance |
+| `grid-column-gap` / `grid-row-gap` | exact px (both longhands) | | |
+| `margin-*` (incl. negative/overlap) | exact px | | |
+| `justify-content` / `align-items` / `text-align` | frame alignment | | |
+| `flex-direction` / order (`order:` when the mobile frame reorders) | | | |
+| `width` / `max-width` / `min-height` | fluid + max-width, never bare px | | |
+| `font-size` / `line-height` / `letter-spacing` | exact from mobile text nodes | | |
+| element hidden/shown at mobile | frame visibility → `display: none` at that breakpoint only | | |
+
+Any Δ outside tolerance → fix at that breakpoint, re-read. Never accept "looks about right" when exact values exist.
+
 ## 3. Standard degradation patterns (design silent)
 
 **Layout:** grid 4/3/2-col → 2-col tablet → 1-col mobile (2-col stays 2 at tablet) · flex row content+media → column (column-reverse if media focal) · equal-items row → wrap 50% or stack · sidebar → stack content-first · multi-col nav → native navbar hamburger.
@@ -51,10 +70,19 @@ Order: ① layout (grid cols, flex direction, display) ② typography ③ spacin
 
 ## 6. Verify every breakpoint
 
-**Structural:** no horizontal overflow · no text clipping/orphan wraps · image aspect correct · spacing rhythm preserved · nav usable (native navbar hamburger — never custom-build) · absolute elements don't bleed.
+**SCORED COMPARE — mandatory wherever a reference frame exists.** A mobile/tablet frame in the design is a reference render exactly like the desktop one, so it gets the same gate, not a softer checklist:
+
+1. Capture the built section at that breakpoint: `node docs/memory/shot-el.js <published-url> <out.png> <W> "<selector>" 1 <port>` — width per breakpoint (390 mobile-P, 767 mobile-L, 991 tablet), `mobile:1` for phone widths (CDP device metrics; `--window-size` does NOT set layout viewport).
+2. Export the mobile/tablet Figma frame PNG (or read it from `04-screenshots/{section}--mobile.png`).
+3. Score: `node docs/memory/pixel-diff.js <mobile-ref.png> <mobile-built.png>` → **PASS ≥97%**, same as desktop. Both images normalized to the same width first.
+4. <97% → read the heatmap regions → §2.1 spacing diff on those classes → ONE batched fix → re-score. Converge; two no-progress passes = STALLED, report exact regions.
+
+No reference frame for a breakpoint → derived values, checklist verification below, and every derived value named in the report.
+
+**Structural:** no horizontal overflow (`scrollWidth > clientWidth` check) · no text clipping/orphan wraps · image aspect correct · spacing rhythm preserved · nav usable (native navbar hamburger — never custom-build) · absolute elements don't bleed · icons non-zero and unsquashed (pixel-verify §1.6).
 **Visual:** hierarchy holds (H1 largest, body readable ≥14px) · contrast still passes · shadows/radii scale OK · images not pixelated.
-**Interactive:** tap targets ≥44 (§4) · hover content has tap equivalent · inputs tappable · parallax/heavy motion off below tablet.
-**Automation:** design-specified breakpoints get property diff (like pixel-verify); derived get this checklist; overflow check via snapshot or user confirm.
+**Interactive:** tap targets ≥44 (§4) · hover content has tap equivalent · inputs tappable · parallax/heavy motion off below tablet · T4 canvas resizes with DPR at mobile (no blur, no fixed px) · IX2/keyframe effects still run or are intentionally disabled.
+**Automation:** reference-frame breakpoints get scored compare + property diff; derived breakpoints get this checklist; overflow always machine-checked, never eyeballed.
 
 ## 7. Common failures → fixes
 
@@ -76,11 +104,12 @@ Order: ① layout (grid cols, flex direction, display) ② typography ③ spacin
 
 ```
 RESPONSIVE — [section]
-breakpoints: [detected] · design-frames: [list | none → derived]
-tablet:   [overrides — design|derived] ✓ overflow ✓ touch ✓ layout · auto-fixes: [list|none]
+breakpoints: [detected] · design-frames: [mobile: node id|NONE (hunt ran) · tablet: …]
+tablet:   [overrides — design|derived] pixel-score NN.N% ✓ overflow ✓ touch ✓ icons · auto-fixes: [list|none]
 mobile-l: [same]
 mobile-p: [same]
 large:    [design | inherited — skipped if no frame]
+spacing-diff: [N/N classes within ±0.5px of mobile frame | deltas fixed: list]
 derived-values: [all derived, for user awareness]
 designer-steps-pending: [none | ledger items]
 touch-targets: [N enforced to ≥44px]

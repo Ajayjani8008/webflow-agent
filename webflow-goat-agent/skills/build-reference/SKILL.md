@@ -42,6 +42,50 @@ description: Lookup tables for Webflow builds — node types, Figma→Webflow el
 
 MCP builder can't create a listed module (missing type/422)? → build it in ledger as Designer step — still NEVER div-imitate it.
 
+## EFFECT FIDELITY LADDER — every visual effect gets a tier, none gets dropped
+
+Source has an effect (hover, pseudo-element, keyframe, canvas, shape, filter, transition) → find its row, build at the LOWEST tier that reproduces it exactly. "Webflow has no control for it" is never a reason to simplify or omit — it is a reason to move one tier down. Every effect from the source lands in the intake `effects:` manifest with its tier, and pixel-verify FAILS on any manifest row with no tier/status (agent Rule 12).
+
+| Tier | Path | Covers |
+|---|---|---|
+| **T1 native control** | `data_style_tool` on class (incl. `pseudo: "hover"/"focus"/"active"`) | color/bg/gradient, spacing, radius, border, box-shadow, opacity, `filter`, `backdrop-filter`, `transform: translate/scale`, `transition-*`, `mix-blend-mode`, `overflow`, `object-fit`, `aspect-ratio`, `position`+offsets, `z-index` |
+| **T2 native structure** | real child element + class (visually identical, Designer-editable) | `::before`/`::after`, custom shapes, decorative overlays/glows, gradient borders, badge dots, underline swipes, masks |
+| **T3 native IX2** | Interactions timeline, Designer-only via MCP → `[critical]` ledger entry with full spec | `@keyframes`/`animation`, scroll-reveal, scroll-progress/parallax, page-load, click-toggle, marquee, infinite loops (IX2 Loop), staggered groups, SVG/Lottie vector motion |
+| **T4 contained code** | last resort, standing-authorization set only (below) | `<canvas>` + JS animation, JS physics/particles/WebGL, cursor-tracking JS, text-scramble/typewriter JS, `clip-path` when T1 read-back fails AND no SVG path works |
+
+### T2 recipes (the pseudo-element + shape answers)
+
+Webflow has NO `::before`/`::after` control and no clip-path control in the Style panel. The native equivalent is a REAL element — same pixels, editable, portable, passes the ban sweep.
+
+| Source CSS | Native build |
+|---|---|
+| `::before`/`::after` decorative box | child `div-block` class `block__deco` · parent `position: relative` · child `position: absolute` + the pseudo's own offsets/size/bg/radius/transform · `pointer-events: none` when non-interactive |
+| `::before` icon/glyph | child `Image` (uploaded SVG) or `text-span`, absolute-positioned — never a font-icon embed |
+| `::after` underline / hover swipe | child div (h 2px, `width: 0`, `left: 0`, `bottom: 0`) + parent `:hover` child `width: 100%` + transition on child base class |
+| `content: counter()` / list markers | native `list`/`list-item` |
+| Gradient border | wrapper div w/ gradient `background-image` + padding = border width; inner div solid bg + inner radius |
+| Glow / soft aura | absolute child, `filter: blur(Npx)`, gradient bg, `z-index: -1` (or behind sibling via order) |
+| **Polygon / hexagon / pentagon / arrow / blob / diagonal cut** | ① **preferred:** export the shape as SVG → `asset_tool` upload → native `Image` (exact, cross-browser, scales) — or as `background-image` on the class ② `clip-path: polygon(...)` via `data_style_tool` — allowed ONLY after read-back proves it applied AND a rendered shot proves it renders; unverified → back to ① ③ still impossible → T4 + log |
+| Rotated shape (Figma `rotation`) | pre-rotated SVG asset — class rotate is not available (see § Transform) |
+
+### T3 recipes (@keyframes → IX2)
+
+Read the `@keyframes` block → convert each stop to an IX2 timeline action on the SAME properties (transform/opacity/filter only). Infinite loop → IX2 "Loop" checkbox. Ledger spec must carry: trigger · target class · every keyframe stop (offset % → property values) · duration · easing · delay · iteration (once/infinite) · direction (normal/alternate) · stagger · reduced-motion note. Mark `[critical]` — an unbuilt animation is a missing feature, never "optional polish".
+
+Not expressible in IX2 (path morph, per-letter scramble, physics) → T4, stated as such in the report.
+
+### T4 — contained code (canvas & JS-driven only)
+
+**Standing authorization:** the user's standing instruction "preserve Canvas animations and every HTML effect, do not simplify" authorizes T4 *for the effects in this table only*. Everything else stays banned forever, `/custom-code-once` unchanged for anything outside it.
+
+Containment rules (all mandatory):
+1. **Scope:** ONE `html-embed` holding only the effect (e.g. `<canvas>` + its `<script>` in an IIFE), or page-footer code. Never layout, spacing, typography, color, hover, or anything a T1–T3 row covers — that is still an instant ban-sweep FAIL.
+2. **Sizing/layout stays native:** the embed's wrapper div is a normal styled class (width/height/position via style tool). Canvas gets `width:100%; height:100%; display:block` + DPR-aware resize (`devicePixelRatio`, `ResizeObserver`) so it is not fixed-px and not blurry on retina.
+3. **Self-contained:** no CDN/`<script src>`, no libraries, no globals (IIFE), guard `if (!el) return`, `cancelAnimationFrame` on unmount/hidden (`document.hidden`), honor `prefers-reduced-motion` (static first frame).
+4. **Log both, same pass:** `registry.md ## Custom-Code-Exceptions` (`[date] page/section — canvas: what, why T1-T3 impossible, standing-authorization`) + `pending_designer_work.md` `[optional]` review entry.
+5. **Report it:** the section report names every T4 effect. Silent code = ban violation even when authorized.
+6. **Fidelity:** reproduce the source animation's actual math (particle count, speed, colors, easing, blend) — a "similar" canvas is a simplification and fails Rule 3.
+
 ## Figma → Webflow element
 
 | Figma | Condition | Webflow |
@@ -132,6 +176,26 @@ No dedicated SVG element — `Image` IS the SVG module (crisp/scalable). Inline 
 **The one flow:** ① `asset_tool upload_image_by_url` (accepts `.svg`, incl. `figma.com/api/mcp/asset/...`) → `{id, url}` ② `data_element_builder` Image → `set_image_asset {image_asset_id, alt_text}`. Bind by **asset id**, never raw URL.
 **Never:** `set_attributes name="src"`/raw CDN URL (→ "does not exist in asset library") · rasterize SVG→PNG for normal icon/logo (only a complex multi-vector graphic that fails as one SVG — note fidelity compromise) · `compress_assets` on SVG (→ 400 "never-compressible").
 
+### SVG pre-flight (before upload — prevents the classic "broken/invisible icon")
+
+Every SVG file is checked and repaired BEFORE it becomes an asset. These are the real causes of icons breaking after a Webflow build:
+
+| Defect | Symptom | Fix before upload |
+|---|---|---|
+| No `viewBox` | icon collapses to 0, or renders 300×150, or won't scale | add `viewBox="0 0 W H"` from the source width/height |
+| `width`/`height` in `pt`/`%`/absent | wrong size, Safari renders tiny/huge | set numeric `width`/`height` attrs (or rely on viewBox + CSS size) |
+| `fill="currentColor"` / no fill | renders black or invisible (CSS can't reach SVG-as-Image) | bake the real hex into the file; one icon per needed color |
+| `<style>` block / CSS classes inside | styles stripped on upload → unstyled/black shape | inline all presentation as attributes |
+| `<foreignObject>` / `<script>` | stripped or blocked; blank render | strip; ask for a clean export |
+| Figma "outline stroke" not applied | stroke widths shift across browsers | prefer outlined paths for icon sets |
+| `<use xlink:href>` to external file | empty render | inline the referenced symbol |
+| `clipPath`/`mask`/`filter` with duplicate ids across icons | one icon overwrites another's mask (multiple SVGs on a page) | unique-prefix every internal id per file |
+| Multi-page/artboard export | only first frame visible | export one node per file |
+
+After upload: keep the returned `{id, url}` in the intake `assets:` list; the icon is not "done" until pixel-verify § SVG audit passes (asset bound by id, URL 200, non-zero rendered box at every breakpoint, count matches reference).
+
+**Sizing:** icons always get explicit class size (`width`+`height` px, or `width:100%`+`max-width`) — an SVG Image with no CSS size is the #1 layout-collapse cause. Add `flex-shrink: 0` on icons inside flex rows so they never squash.
+
 ## Element builder text gotcha (verified 2026-07-11)
 
 Inline `set_text` honored ONLY on `Heading`, `Paragraph`, `Button`, `TextLink`, `LinkBlock`. `TextBlock` → created as plain `Block` + placeholder String child, `set_text` silently ignored → renders "This is some text inside of a div block." Fixes: (a) prefer Paragraph/Heading; (b) read subtree, `set_text` on the **String child node id** (Block parent → "element doesn't support text"); (c) text leaf needing a margin-free div: `type: "DOM"` + `set_dom_config {dom_tag:"div"}` — DOM divs take `set_text` reliably, no default `<p>` margin (verified, see [[webflow-pixel-match-method]]). Batch all String set_text in one call.
@@ -170,7 +234,7 @@ Never copy reference JS/CSS — rebuild intent natively.
 **Sources:** user description → parse to `trigger + target + property + timing` (e.g. "cards fade up staggered on scroll" → scroll-into-view, opacity 0→1 + translateY 24→0, 100ms stagger, once); ask ONLY if a choice changes the build. Reference URL → WebFetch page/CSS + screenshot states → identify what/trigger/timing → replicate intent (state: approximation, not pixel copy).
 **Routing:** hover/focus/active/state → class + transition via style tool → **buildable now**. Scroll-reveal/scroll-progress/page-load/click-toggle/mouse-parallax → **IX2 = Designer-only via MCP** → exact spec to pending_designer_work.md: trigger, target, from→to, duration, easing, delay, stagger, Limit: once, reduced-motion note. Never fake IX2 with embeds.
 **Quality defaults:** animate ONLY transform/opacity/filter, max 3 props (never width/height/top/left/margin/padding/font-size — jank). Durations: UI 150-300ms, entrances 400-700, hero 600-900. Easing: entrances `ease-out`/`cubic-bezier(.2,.6,.2,1)`, loops `ease-in-out`. Stagger: 2-3 items 100ms · 4-6 80 · 7-12 60 · >12 40; max 150. Scroll reveals Limit: once. Respect `prefers-reduced-motion`. Intensity per user (subtle ↔ high), state which applied.
-**Report split every time:** applied NOW (hover/state) vs queued IX2 specs — nothing silently missing. Effect neither can do → out of native scope + nearest alternative; no code.
+**Report split every time:** applied NOW (T1 hover/state) vs T2 structure built vs queued T3 IX2 specs vs T4 contained code — nothing silently missing. Effect no tier can reach → impossible_cases.md + nearest alternative, stated plainly.
 
 ## Impossible cases
 
