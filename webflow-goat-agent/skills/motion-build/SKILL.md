@@ -28,6 +28,7 @@ Per source:
 - **Video / GIF / screen recording** → count frames for real timing (`ffprobe` / frame extraction when available): start→end frame per move → ms; easing from frame spacing (even = linear, back-loaded = ease-out). Never eyeball a duration when frames exist.
 - **Live URL** → the CSS/JS is the spec: grep stylesheets for `@keyframes`/`animation:`/`transition:`; grep JS for `gsap.`/`ScrollTrigger`/`IntersectionObserver`/`requestAnimationFrame`. Record real numbers (durations, eases, stagger, scrub ranges). **A reference site using GSAP-by-code is still rebuilt in the native panel** — same engine, native surface.
 - **GSAP / CSS code pasted** → read it literally; every tween, ease, stagger and ScrollTrigger config maps onto a panel control. Translate, never transplant.
+- **HTML delivery (files on disk)** → the CSS/JS is the spec AND the reference is runnable: read every stylesheet/script in full (design-intake §C.0), then run it headless via `file://` — `motion-verify.js` for the reference fingerprint (what moves, declared durations, triggers) and `state-shot.js` for hover/scroll state images (design-intake §C.6). Library-driven motion (GSAP/AOS/Swiper/Lottie/particles) is routed by design-intake §C.2b; the fingerprint becomes the parity baseline pixel-verify §1.8 scores against. Never re-inject the reference's library.
 - **Figma prototype** → `get_motion_context` / prototype links: trigger, transition type, duration, easing, smart-animate pairs.
 
 **Output = Motion IR, one line per animation** (in the intake spec beside `effects:`):
@@ -104,7 +105,7 @@ Rules: durations in the panel's own unit (seconds unless it shows ms) · easing 
 node docs/memory/webflow/motion-verify.js <url> <out.json> <W> "<selector>" <hover|click|load|scroll|all> <mobile:1|0> <port>
 ```
 
-Bundled with this skill (`~/.claude/skills/motion-build/motion-verify.js`; copy into the project's `docs/memory/webflow/` on first use). Needs `ws` (`npm i ws --no-save` at home dir) + Chrome. `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one launch, then it re-runs under `prefers-reduced-motion: reduce`.
+Bundled with this skill (`~/.claude/skills/motion-build/motion-verify.js`; copy into the project's `docs/memory/webflow/` on first use). Needs `ws` (`npm i ws pngjs pixelmatch --no-save` at home dir) + Chrome. `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one launch, then it re-runs under `prefers-reduced-motion: reduce`.
 
 Per element: `moved` · `propsAnimated` (transform/opacity/filter **and** colour/shadow — a colour-fade hover is real motion) · `jankProps` (layout properties that changed) · **`durationDeclaredMs`** (exact, from computed `animation-duration`/`transition-duration`) · `durationObservedMs` (proof it ran; coarse) · `declared` strings · `ix2` (`data-w-id` present) · `initialStateFlash`; plus page-level `reducedMotion` and a one-line `verdict`.
 
@@ -116,7 +117,10 @@ Gates:
 - [ ] `reducedMotion.respected: true`
 - [ ] Mobile: motion either deliberately scoped off at that breakpoint or verified running; scrub/parallax off below tablet by default
 - [ ] Loops: no per-cycle layout shift, frame deltas stable
+- [ ] **Reference parity (runnable reference only):** diff the built fingerprint against the reference fingerprint row by row (match by visual role, not selector) — same trigger, same animated properties, declared duration within ±10% (CSS tier), same iteration/loop, same reduced-motion behaviour. A row that exists in the reference and not in the built JSON is a dropped animation, not a styling nit
 - [ ] `ix2` field is informational only — Classic Interactions emit `data-w-id`; a GSAP-panel interaction may not, so **never treat a missing `data-w-id` as failure. Measured movement is the evidence.**
+
+**Reading the JSON without chasing ghosts** (verified 2026-07-28 on a `file://` reference): a row with `moved: false` + `jankProps: ["width"]` in `load` mode is page layout settling (scrollbar/reflow during the first frames), not an animation — judge jank only on rows that actually `moved`. `durationDeclaredMs` is trustworthy for CSS animation/transition rows (`declared.animation`/`declared.transition` populated); `null` + moved = JS/panel-driven, use observed. `reducedMotion FAIL` on a reference just means the source ignored the media query — mirror the source, then decide with the user whether the build should improve on it (state which).
 
 Failure → fix at the owning tier, re-run. Two no-progress passes = STALLED, report each row with what is missing. An IR row that cannot be proven is not `built`.
 

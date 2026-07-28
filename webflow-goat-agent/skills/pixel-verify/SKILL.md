@@ -1,6 +1,6 @@
 ---
 name: pixel-verify
-description: Mandatory verification loop after building each Webflow section — tier auto-selected (LIGHT/FULL), automated screenshot capture, DOM read-back, property diff against the intake spec, visual compare, one batched fix pass. A section is not done until this passes. This is the accuracy engine.
+description: Mandatory verification loop after building each Webflow section — tier auto-selected (LIGHT/FULL), automated screenshot capture, DOM read-back, property diff against the intake spec, visual compare, per-state behaviour parity (hover/scroll/load vs the reference), one batched fix pass. A section is not done until this passes. This is the accuracy engine.
 ---
 
 # Pixel Verify
@@ -23,7 +23,9 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 
 **PUBLISH ONCE.** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once for final typography + responsive sign-off (all breakpoints in one publish). Re-publish only if that pass finds a real defect.
 
-**Published shots:** `node docs/memory/shot-el.js <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (needs `ws`: `npm i ws --no-save` at home dir; unique port per run).
+**Published shots:** `node docs/memory/shot-el.js <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (needs `ws`: `npm i ws pngjs pixelmatch --no-save` at home dir; unique port per run).
+
+**Interaction states:** `node docs/memory/webflow/state-shot.js <url> <outPrefix> <W> "<sel>" "base,auto,scroll:40,click:.tab" <mobile> <port>` (lives beside the other verify scripts — `shot-el.js`, `pixel-diff.js`, `motion-verify.js`, `ref-extract.js`) — resting + hover + focus + click + scrolled shots in one browser launch, on a published URL or a `file://` reference. Required for §1.8; `pixel-diff.js` scores each matched pair. (`auto` hovers up to 6 interactive descendants; name selectors explicitly when the auto set misses one.)
 - **Clip to element's bounding box, NOT `{x:0,y:0}`** — CDP clip is PAGE-origin; fixed `y:0` captures blank page top. ~5-6KB PNG = blank capture → wrong clip or unpublished/opacity-hidden page.
 - **Mobile: `--window-size` does NOT set layout viewport** — script uses CDP `Emulation.setDeviceMetricsOverride {mobile:true, deviceScaleFactor:2}` + ws header `Origin: http://localhost` + ABSOLUTE `--user-data-dir`. See [[webflow-mcp-gotchas]].
 
@@ -93,6 +95,32 @@ Walk the intake `effects:` manifest row by row. Every row must resolve to exactl
 
 Row with no status, or an effect visible in the reference that never entered the manifest → FAIL (go back to intake, extend the manifest, build it). "Simplified", "close enough", "skipped for now" are not valid statuses.
 
+## 1.8 BEHAVIOUR PARITY GATE (HTML / live-URL references — the "it looks right but does nothing" gate)
+
+A static-only match is not a match. Whenever the reference is runnable (HTML delivery or live URL — intake §C.6 / url-intake), the built page is measured in the SAME states as the reference and the two are compared, not described.
+
+**Capture both sides identically** (same widths, same state list, unique ports):
+
+```
+node docs/memory/webflow/state-shot.js    "<ref-url|file://…>" ref-cache/…/{sec}   1440 "{refSel}"   "base,auto,scroll:40" 0 9271
+node docs/memory/webflow/state-shot.js    "<published-url>"    built/{sec}          1440 "{builtSel}" "base,auto,scroll:40" 0 9272
+node docs/memory/webflow/motion-verify.js "<published-url>"    built/{sec}-motion.json 1440 "{builtSel}" all 0 9262
+node docs/memory/webflow/pixel-diff.js    ref-cache/…/{sec}-hover-x.png built/{sec}-hover-y.png     # one score per matched state
+```
+
+Match states by visual role (reference `.btn` ↔ built `.hero__cta`), not by selector name.
+
+- [ ] **Every hover/focus/active state in the manifest has a state shot on both sides**, scored ≥97% like the resting shot. Missing state on the built side = the effect was not built, regardless of the base score
+- [ ] **Hover DELTA exists:** built `base ↔ hover` differs in the same regions the reference's `base ↔ hover` differs. Identical base/hover on the built side = dead hover (transition on the wrong class, or state never set)
+- [ ] **Scroll states match:** reveals fired, parallax/sticky offsets landed, nothing stuck at `opacity: 0` (compare `scroll-*` shots; also `initialStateFlash` in the motion JSON)
+- [ ] **Timing parity:** each animated row's `durationDeclaredMs` (built) == the reference value ±10% for CSS-owned motion; panel-owned motion has no declared duration → require `moved: true` + observed within ±40% (motion-build § Phase 5). Easing keyword/curve matches the manifest
+- [ ] **Trigger parity:** the built motion fires on the same trigger (hover/scroll-in/load/click/mouse-move), fires the same number of times (once vs loop), and respects reduced-motion if the reference did
+- [ ] **`jankProps` empty** on the built page — a parity that only exists via animated width/height/top/left is a rebuild, not a pass
+- [ ] **Pseudo-element children present** (T2 rows): the reference's `::before`/`::after` visuals appear in the built shots — a missing glow/underline/shape is a visible diff even at high base score
+- [ ] **Canvas/T4 rows actually run** in the published page (motion JSON shows movement inside the embed's wrapper), and their parameters match §C.4 capture — a frozen or "similar" canvas FAILS
+
+Reference could not be run (`reference-not-run`) → this gate degrades to: manifest rows verified individually on the built page (motion-verify + state shots on the built side only), and the report says the reference baseline was unavailable. It is never silently skipped.
+
 ## 2. Property diff (FULL tier — LIGHT uses spot-check list from §T)
 
 Per class, read back applied styles, diff value-by-value: font-family/weight/size/line-height/letter-spacing · color/background-color · background-image (gradient stops+angle) · display/flex-direction/flex-wrap · justify-content/align-items/align-self · gap (both longhands) · padding ×4 · margin ×4 · width/max-width/min-width/height · border-radius ×4 corners · border (width/style/color per side) · box-shadow (x/y/blur/spread/color/inset) · opacity · filter · object-fit/position · position/top/right/bottom/left · z-index · overflow · text-align/decoration/transform · white-space/word-break/overflow-wrap.
@@ -133,13 +161,16 @@ ICONS/SVG    ✓ N/N bound by asset id, viewBox, sized, 200 OK, non-zero at all 
 STRUCTURE    ✓ N/N elements, classes, exact copy, order
 PROPERTIES   ✓ N/N → fixed: [list] · remaining: [list or none]
 EFFECTS      N/N manifest rows resolved — built: E1,E2 · interactions-queued: E3 · code-tier: E4 · impossible: none
+BEHAVIOUR    [HTML/URL ref] states scored: base NN.N% · hover ×n NN.N% · scroll NN.N% · click/focus NN.N%
+             hover-delta present n/n · timing ✓ (declared vs reference) · triggers ✓ · jank 0 · canvas running ✓
+             | reference-not-run: [reason] → built-side measurement only
 VISUAL       pixel-score: NN.N% (≥97 = PASS) · render-features verified: [gradients/blurs/overlaps checked]
              human: confirmed/unconfirmed
 IMPOSSIBLE   none | [list + native alternative]
 VERDICT      PASS → responsive-pass | STALLED → [each diff + reason + resolution] | FAIL → rebuild
 ```
 
-NATIVE / CONTENT / ICONS / EFFECTS lines are hard gates and come first — an unauthorized embed, one placeholder string, one broken icon, or one unresolved effect row never reaches PASS regardless of pixel score. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.
+NATIVE / CONTENT / ICONS / EFFECTS / BEHAVIOUR lines are hard gates and come first — an unauthorized embed, one placeholder string, one broken icon, one unresolved effect row, or one dead hover never reaches PASS regardless of pixel score. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.
 
 ## 6. Edge cases
 

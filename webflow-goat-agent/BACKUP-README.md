@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.3.0
+# Webflow GOAT Agent — Backup v1.7.0
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -14,12 +14,23 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `CLAUDE.md` | repo/pack root only | Thin router pointing to the agent file — NOT the brain anymore (v1.2.0 dedup); do not restore as `~/CLAUDE.md` |
 | `skills/*` | `~/.claude/skills/` | 9 lazy skills: build-reference, design-intake, figma-setup, pixel-verify, responsive-pass, session-recovery, **url-intake (new)**, **custom-code-once (new)**, **webflow-help (new)** |
 | `how-to-use.md` | anywhere user-readable (also `~/docs/memory/webflow/`) | Human manual — never loaded by the agent during builds |
-| `docs-memory/*` | `~/docs/memory/webflow/` | registry.md (fresh single-file template), pending_designer_work.md, impossible_cases.md, error_learnings.md (incl. merged v5 lessons), scripts: shot.js / shot-el.js / **ref-extract.js (new)** |
+| `docs-memory/*` | `~/docs/memory/webflow/` | registry.md (fresh single-file template), pending_designer_work.md, impossible_cases.md, error_learnings.md (incl. merged v5 lessons), scripts: shot.js / shot-el.js / ref-extract.js / pixel-diff.js / motion-verify.js / **state-shot.js (new v1.7.0 — interaction-state shots for behaviour parity)** |
 | `rules/webflow-core.md` | `~/.claude/rules/webflow/core.md` | 8-line GOAT router (replaces retired 85-line v5 orchestrator) |
 | `rules/common-agents.md` | `~/.claude/rules/common/agents.md` | Platform routing — Webflow rows point to webflow-goat |
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.7.0 changes (since v1.6.0) — HTML behaviour parity + MCP 2.0.1 compatibility
+
+1. **New agent Rule 16 — HTML/URL reference is a BEHAVIOUR contract, not a layout picture.** The reference counts as "read" only after every file it pulls in is read end to end (markup + every local css/js + inline blocks + every CDN library), then the reference is RUN headless. Layout-only recreation is a FAIL, not a partial.
+2. **design-intake §C rebuilt:** §C.0 mandatory full-source inventory/review · §C.2 grep table extended (cursor/mouse effects, preloaders + load sequences, reveal classes + IntersectionObserver, `animation-delay`/`direction`/`fill-mode`/`cubic-bezier`/`steps`, `prefers-reduced-motion`, autoplay video) · **§C.2b library sweep** (GSAP/ScrollTrigger, AOS/ScrollReveal/WOW, Swiper/Slick/Splide, Lenis/Locomotive, Lottie-web, three.js/particles, typed.js/Splitting/countUp, Isotope, jQuery toggles → native route each) · §C.5 exact timing capture (no house defaults unless the source is silent, tagged `derived`) · **§C.6 run the reference** (`file://` → computed CSS + state shots + motion fingerprint).
+3. **New script `state-shot.js`** — one headless launch captures base + hover + focus + click + scrolled states of the same element, on a published URL *or* a local `file://` reference; writes per-state PNGs + a JSON index. Verified working (hover deltas measured in the expected regions).
+4. **pixel-verify §1.8 BEHAVIOUR PARITY gate:** both sides captured in the same states, scored per state with `pixel-diff.js`; fails a dead hover (no base↔hover delta), a reveal that never fires, missing T2 pseudo-element children, a frozen canvas, wrong trigger, or CSS-tier timing off by >10%. New `BEHAVIOUR` line in the match report, hard gate alongside NATIVE/CONTENT/ICONS/EFFECTS.
+5. **motion-build:** HTML-delivery source row (reference fingerprint via `file://`) + reference-parity verify gate (row-by-row trigger/props/duration/iteration/reduced-motion diff against the reference JSON).
+6. **url-intake:** live URLs get the same behaviour bar — state shots + motion fingerprint are mandatory, effect sweep now runs the full §C.2 table plus the library sweep.
+7. **MCP 2.0.1 compatibility (build-reference § MCP surface, verified 2026-07-28):** session preamble (`webflow_guide_tool` → explicit `site_id` → `data_agent_instructions_tool > search_instructions`, re-run per site switch) · exact breakpoint ids (xxl/xl/large/main/medium/small/tiny) · current element action names (`set_attributes`, `move_element`, `query_elements`, `data_element_settings_tool` set_tag/set_visibility/set_dom_id/get_bindable_sources, `set_display_name`) · **components/props/variants/slots are API-buildable now** → repeated block = component with props, not N copies; component work is no longer a Designer handoff · variable `custom_value` for `calc()`/`clamp()`/`color-mix()` · localization writes secondary locales only · `get_more_tools` before ever calling a capability missing · `data_whtml_builder` + scripts tool remain banned.
+8. **Unchanged on purpose:** no GSAP injection ever, native-first ladder T1-T4, effect manifest contract, content/icon gates, one-publish-per-section batching, source isolation.
 
 ## v1.3.0 changes (since v1.2.0) — 99%+ accuracy upgrade (user hard rules)
 

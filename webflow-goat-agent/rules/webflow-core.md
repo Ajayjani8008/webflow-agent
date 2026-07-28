@@ -1,6 +1,8 @@
-# Webflow Routing (v1.6 — GOAT agent system)
+# Webflow Routing (v1.7 — GOAT agent system)
 
 ALL Webflow work — any size, any source (Figma / screenshot / HTML / live URL / description) — is handled by the **webflow-goat** agent (`~/.claude/agents/webflow/webflow-goat.md`) or done inline following its rules. It works end-to-end inline: intake → build → pixel-verify → responsive-pass.
+
+- v1.7: HTML/URL references are **behaviour contracts** — every css/js file read in full, the reference RUN headless for hover/scroll/load state shots + a motion fingerprint, per-state parity scored in pixel-verify §1.8. MCP session preamble: `webflow_guide_tool` → explicit site_id → `data_agent_instructions_tool` site rules; components/props/variants are API-buildable (build-reference § MCP surface).
 
 - Do NOT use the retired v5 system: no `webflow-builder` spawns, no complexity classifier, no `~/.claude/webflow-kb/` (retired 2026-07-16 → backups; lessons merged into `docs/memory/webflow/error_learnings.md`).
 - Skills (lazy, one per need): design-intake (Figma/screenshot/HTML) · url-intake (live URL ONLY) · figma-setup · motion-build (any animation/interaction) · pixel-verify · responsive-pass · build-reference · session-recovery. Source isolation: never load the other source's skill/cache.
