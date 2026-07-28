@@ -15,7 +15,9 @@ description: Turn cross-site portability on or off for the current build (/porta
 - Intent phrases: "copy this to another site", "reuse on our other project", "portable", "self-contained", "cloneable", "template", "for multiple sites".
 - Ambiguous ("might reuse this later") → ONE yes/no question, never an assumption.
 
-State lives in `build_state.json` `portable: true|false` so it survives a session death, and every affected class is tagged in `registry.md ## Portable` with the date. Switching mid-build does NOT retro-fix classes already written — say so, and offer to rewrite the ones already built.
+State lives in this site's `build_state.json` (`portable: true|false`, `portable_switched_at`) so it survives a session death, and every affected class is tagged in `registry.md ## Portable` with the date.
+
+**MID-BUILD SWITCH IS A GATED DECISION, NOT A FLAG FLIP (v1.9.0).** Switching does NOT retro-fix classes already written, so a half-portable section — some classes on `var()`, some on literals — is a broken deliverable that looks fine in the Designer and collapses on paste. On any switch mid-build: count the classes already written, name them, and ask one line — *"Portable ON from here. N classes already use variables: rewrite them to literals now (recommended, keeps the section pasteable), or scope portable to the remaining classes only?"* Record the answer plus `portable_switched_at` in build_state, and list every pre-switch class in the portability report under **Manual on target**. No answer → rewrite them (a self-contained section is the point of the mode).
 
 ## Confirm line before the first portable class
 

@@ -75,7 +75,7 @@ Ask the user once, plainly: *"Does this site's Interactions panel show a horizon
 
 **Lottie tier** — ① probe once per site: upload the `.json` via `asset_tool`, build a `Lottie` element, set its source; record works/rejected + error in `error_learnings.md`, never re-probe. ② Rejected → Interactions panel or a documented impossible case. ③ Set loop/autoplay/direction/speed via element settings; verify it plays (§ Phase 5).
 
-**code tier** — canvas/WebGL only, build-reference § Ladder T4 containment rules unchanged.
+**code tier** — canvas/WebGL only; containment rules unchanged (build-reference § Ladder T4).
 
 ## Phase 4 — Designer build-script (the handoff that must not cost a conversation)
 
@@ -102,10 +102,10 @@ Rules: durations in the panel's own unit (seconds unless it shows ms) · easing 
 ## Phase 5 — Motion verify (measured, never claimed)
 
 ```
-node docs/memory/webflow/motion-verify.js <url> <out.json> <W> "<selector>" <hover|click|load|scroll|all> <mobile:1|0> <port>
+node "$WF/scripts/motion-verify.js" <url> <out.json> <W> "<selector>" <hover|click|load|scroll|all> <mobile:1|0> <port>
 ```
 
-Bundled with this skill (`~/.claude/skills/motion-build/motion-verify.js`; copy into the project's `docs/memory/webflow/` on first use). Needs `ws` (`npm i ws pngjs pixelmatch --no-save` at home dir) + Chrome. `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one launch, then it re-runs under `prefers-reduced-motion: reduce`.
+Canonical copy: `$WF/scripts/motion-verify.js` (`WF="$HOME/docs/memory/webflow"`; a mirror ships beside this skill for portability). Needs `ws` (`npm install` in `$WF`) + Chrome. `load` samples from the first frame the DOM exists, `scroll` steps the section through the viewport, `hover` hovers **every interactive descendant in turn** (up to 8), `click` dispatches a real click, `all` runs the lot in one launch, then it re-runs under `prefers-reduced-motion: reduce`.
 
 Per element: `moved` · `propsAnimated` (transform/opacity/filter **and** colour/shadow — a colour-fade hover is real motion) · `jankProps` (layout properties that changed) · **`durationDeclaredMs`** (exact, from computed `animation-duration`/`transition-duration`) · `durationObservedMs` (proof it ran; coarse) · `declared` strings · `ix2` (`data-w-id` present) · `initialStateFlash`; plus page-level `reducedMotion` and a one-line `verdict`.
 
@@ -121,6 +121,10 @@ Gates:
 - [ ] `ix2` field is informational only — Classic Interactions emit `data-w-id`; a GSAP-panel interaction may not, so **never treat a missing `data-w-id` as failure. Measured movement is the evidence.**
 
 **Reading the JSON without chasing ghosts** (verified 2026-07-28 on a `file://` reference): a row with `moved: false` + `jankProps: ["width"]` in `load` mode is page layout settling (scrollbar/reflow during the first frames), not an animation — judge jank only on rows that actually `moved`. `durationDeclaredMs` is trustworthy for CSS animation/transition rows (`declared.animation`/`declared.transition` populated); `null` + moved = JS/panel-driven, use observed. `reducedMotion FAIL` on a reference just means the source ignored the media query — mirror the source, then decide with the user whether the build should improve on it (state which).
+
+**Honest precision, stated not implied (v1.9.0):** the ±40% band on panel-built motion is a *presence* check, not a timing check — panel interactions are JS per-frame transforms with no declared duration, so observed time carries trigger latency and settle. Say exactly that in the report ("timing: present, not precisely measurable — panel tier") instead of writing a number that implies verification. CSS-tier rows are the opposite: `durationDeclaredMs` is exact, so they are held to ±10% with no excuse.
+
+**Evidence, not claim:** paste the `motion-verify` JSON verdict rows (or the file path plus the per-row `moved`/`durationDeclaredMs`/`jankProps` values) into the handoff/report. "Animation verified" without the measurement output is an unverified claim (pixel-verify §3).
 
 Failure → fix at the owning tier, re-run. Two no-progress passes = STALLED, report each row with what is missing. An IR row that cannot be proven is not `built`.
 

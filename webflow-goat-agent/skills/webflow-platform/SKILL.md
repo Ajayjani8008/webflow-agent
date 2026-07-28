@@ -34,7 +34,7 @@ Every SVG file is checked and repaired BEFORE it becomes an asset. These are the
 | `clipPath`/`mask`/`filter` with duplicate ids across icons | one icon overwrites another's mask (multiple SVGs on a page) | unique-prefix every internal id per file |
 | Multi-page/artboard export | only first frame visible | export one node per file |
 
-After upload: keep the returned `{id, url}` in the intake `assets:` list; the icon is not "done" until pixel-verify § SVG audit passes (asset bound by id, URL 200, non-zero rendered box at every breakpoint, count matches reference).
+After upload: keep the returned `{id, url}` in the intake `assets:` list; the icon is not "done" until pixel-verify §1.6 passes (asset bound by id, URL 200, non-zero rendered box at every breakpoint, count matches reference).
 
 **Sizing:** icons always get explicit class size (`width`+`height` px, or `width:100%`+`max-width`) — an SVG Image with no CSS size is the #1 layout-collapse cause. Add `flex-shrink: 0` on icons inside flex rows so they never squash.
 
@@ -60,6 +60,35 @@ Inline `set_text` honored ONLY on `Heading`, `Paragraph`, `Button`, `TextLink`, 
 - **Long ops: keep the handle yourself.** If a call hands back a task instead of a result (publish, bulk asset upload), store the task id in `build_state.json` and poll it (`tasks/get`, cancel via `tasks/cancel`). There is no `tasks/list` on new servers, so an unstored id is unrecoverable — storing it is also harmless on old ones.
 - **Never depend on roots, sampling or protocol logging.** Deprecated with a 12-month removal window; we already use none of them. Nothing to change, nothing to add.
 - **Server-delivered HTML is never build output.** MCP Apps render interactive HTML in a sandboxed client iframe — it is UI, not markup to ship. HTML from any MCP app or tool never enters an `html-embed`, `data_whtml_builder`, or a page; the custom-code ban applies to it exactly as to hand-written code.
+
+**What of the above you can actually act on (v1.9.0 honesty note).** Tool calls go through the client, which owns the JSON-RPC layer — so spend effort only where the agent has a lever:
+| Rule | Status |
+|---|---|
+| fresh post-write read-back | **enforceable** — it is your call which read you trust; this is the one that catches real defects |
+| re-run the preamble on reconnect / site switch / tool-list change | **enforceable** |
+| never auto-answer a user-reserved prompt | **enforceable** — and it is a ban-level rule |
+| store task ids from long operations | **enforceable** (build_state `tasks[]`) |
+| re-read a tool schema after a validation error | **enforceable** |
+| `ttlMs`/`cacheScope`, raw `-32002`/`-32602`, `inputResponses` wire fields | **informational** — the client normalizes these; you may never see them. Recognize the *symptoms* (stale read, id that vanished, a call that asks for more input) and apply the rule; never burn calls hunting the wire format |
+
+## Cross-browser caveats (verify in Safari before calling a T1/T2 effect done)
+
+Everything the verification scripts measure runs in headless Chrome, so Chrome-only correctness is the blind spot. The ladder leans hardest on exactly the properties that diverge:
+- `backdrop-filter` — needs `-webkit-` in older Safari; stacked with `mix-blend-mode` it can drop out entirely. Layered glass headers are the usual casualty.
+- `mix-blend-mode` / `isolation` — Safari composites differently against a parent with `opacity` or `transform`; a blend that reads correct in Chrome can go opaque.
+- `clip-path: polygon()` on a transformed/animated element — Safari can drop the clip mid-animation. The SVG-asset route (build-reference T2) has no such issue, which is why it is `preferred`.
+- `position: sticky` inside a flex/grid parent with `overflow` — Safari releases the stick earlier.
+- `100vh` — dynamic toolbars; prefer `100svh`/`100dvh` where the design allows, and state the choice.
+- Lottie + `will-change` on many layers — Safari memory pressure, not a visual bug: watch for a frozen loop after scroll.
+Any section using these: say in the report that the score is Chrome-measured and name the properties a human should eyeball in Safari once. Never claim cross-browser parity from a headless Chrome number.
+
+## Snapshot before destructive (v1.9.0 — the missing undo)
+
+There is no undo API. Before ANY rebuild/delete/replace — `remove_element` on a subtree you did not just create, a "delete, rebuild native, restart verify" after a ban hit, `unregister_component`, replacing a section, `POST /dom` — capture first:
+1. `element_snapshot_tool` on the target (and `data_element_tool > get_all_elements` depth -1 for a subtree) ,
+2. append to this site's `build_state.json` → `snapshots[]`: `{target, reason: "pre-rebuild|pre-delete|pre-unregister", snapshot: <path or id list>, at}`,
+3. then destroy.
+An interrupted rebuild leaves that entry open — session-recovery step 7 surfaces it as work to finish, not as a mystery. Destroying without the snapshot entry is the one irreversible mistake this pack can make; treat it like a ban violation.
 
 ## MCP surface (Webflow MCP 2.0.1 — verified 2026-07-28 via `webflow_guide_tool`)
 

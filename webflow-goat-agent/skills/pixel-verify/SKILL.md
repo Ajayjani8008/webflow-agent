@@ -12,6 +12,8 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 ## T. Depth selection (property diff only — visual compare is NEVER reduced)
 
 **Side-by-side visual compare against the reference runs for EVERY section, both tiers, no exceptions.** Only the property-diff table depth varies:
+**LIGHT is a claim you must show, not a mood (v1.9.0):** choosing it means writing the qualifying line in the report — `depth: LIGHT (elements 6 ≤8 · gradients 0 · absolute/sticky 0 · native modules none · flex simple · shadow layers 1)`. Any condition unmet, any doubt, or any visual diff at all → **FULL**, no negotiation. Section 1, heroes, forms/sliders/tabs/navbar and anything the user flagged are FULL by definition.
+
 - **LIGHT** (ALL true: ≤8 elements · no gradients · no absolute/sticky · no form/slider/tabs/navbar · simple flex · no multi-layer shadows): spot-check per class — `display`/`flex-direction` · `grid-column-gap`/`grid-row-gap` · `padding-top`/`padding-bottom` · `font-size` · `font-weight` · `color` · `background-color` · width strategy. Any fail OR any visual diff → escalate to FULL.
 - **FULL** otherwise, and always for section 1, heroes, anything user flagged.
 
@@ -21,11 +23,14 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 
 **`element_snapshot_tool` DOES NOT LOAD CUSTOM WEB FONTS (verified 2026-07-12).** Custom fonts render as serif fallback — mangled-Times H1 = snapshot artifact, NOT a bug. Before "fixing" a font mismatch: confirm font installed (`data_fonts_tool`) + class `font-family` correct — both right = tool lying. **Never restyle typography off the snapshot.** Typography + anything font-metric-dependent (wrapping, line count, overflow) → verify against PUBLISHED page only.
 
-**PUBLISH ONCE — one publish serves every published-page check.** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once, then in ONE browser session capture: final typography shot · behaviour-parity states (§1.8 `state-shot.js`) · motion fingerprint (`motion-verify.js all`) · every breakpoint shot responsive-pass §6 needs. Score them together. Re-publish only if that combined pass finds a real defect — a second publish for "the mobile shots" or "the hover shots" is a process bug, not thoroughness.
+**PUBLISH ONCE, THEN AT MOST ONE VERIFICATION RE-PUBLISH (v1.9.0).** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once, then in ONE browser session capture: final typography shot · behaviour-parity states (§1.8 `state-shot.js`) · motion fingerprint (`motion-verify.js all`) · a11y/perf audit (§1.9) · every breakpoint shot responsive-pass §6 needs. Score them together.
+That combined pass finds real defects → fix them in ONE batch → **one verification re-publish is allowed and expected**, capped at **2 publishes per section**, counted in the report and in `build_state.sections[].publishes`. Convergence outranks publish-thrift: never accept a visible defect because "we already published". What stays a process bug is publishing *per artifact* — one publish for the mobile shots, another for the hover shots. A 3rd publish means something is being fixed blind: stop, read the actual state, then fix.
 
-**Published shots:** `node docs/memory/webflow/shot-el.js <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (needs `ws`: `npm i ws pngjs pixelmatch --no-save` at home dir; unique port per run).
+**Script root, resolved once per session:** `WF="$HOME/docs/memory/webflow"` — every verification command is `node "$WF/scripts/<name>.js" …`, so it runs from any working directory (v1.9.0). Deps are pinned in `$WF/package.json` → `npm install` there; never `npm i --no-save`, which prunes the others.
 
-**Interaction states:** `node docs/memory/webflow/state-shot.js <url> <outPrefix> <W> "<sel>" "base,auto,scroll:40,click:.tab" <mobile> <port>` (lives beside the other verify scripts — `shot-el.js`, `pixel-diff.js`, `motion-verify.js`, `ref-extract.js`) — resting + hover + focus + click + scrolled shots in one browser launch, on a published URL or a `file://` reference. Required for §1.8; `pixel-diff.js` scores each matched pair. (`auto` hovers up to 6 interactive descendants; name selectors explicitly when the auto set misses one.)
+**Published shots:** `node "$WF/scripts/shot-el.js" <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (unique port per run).
+
+**Interaction states:** `node "$WF/scripts/state-shot.js" <url> <outPrefix> <W> "<sel>" "base,auto,scroll:40,click:.tab" <mobile> <port>` — resting + hover + focus + click + scrolled shots in one browser launch, on a published URL or a `file://` reference. Required for §1.8; `pixel-diff.js` scores each matched pair. `auto` hovers up to 6 interactive descendants; **`auto:N` raises the cap, and everything past it returns as `unverifiedStates` + a stderr WARN. An unhovered interactive element is an UNVERIFIED state, never an absent one** — raise the cap, name it with `hover:<sel>`, or list it as unverified in the report. Ignoring the warning silently = failed gate.
 - **Clip to element's bounding box, NOT `{x:0,y:0}`** — CDP clip is PAGE-origin; fixed `y:0` captures blank page top. ~5-6KB PNG = blank capture → wrong clip or unpublished/opacity-hidden page.
 - **Mobile: `--window-size` does NOT set layout viewport** — script uses CDP `Emulation.setDeviceMetricsOverride {mobile:true, deviceScaleFactor:2}` + ws header `Origin: http://localhost` + ABSOLUTE `--user-data-dir`. See [[webflow-mcp-gotchas]].
 
@@ -107,10 +112,10 @@ A static-only match is not a match. Whenever the reference is runnable (HTML del
 **Capture both sides identically** (same widths, same state list, unique ports):
 
 ```
-node docs/memory/webflow/state-shot.js    "<ref-url|file://…>" ref-cache/…/{sec}   1440 "{refSel}"   "base,auto,scroll:40" 0 9271
-node docs/memory/webflow/state-shot.js    "<published-url>"    built/{sec}          1440 "{builtSel}" "base,auto,scroll:40" 0 9272
-node docs/memory/webflow/motion-verify.js "<published-url>"    built/{sec}-motion.json 1440 "{builtSel}" all 0 9262
-node docs/memory/webflow/pixel-diff.js    ref-cache/…/{sec}-hover-x.png built/{sec}-hover-y.png     # one score per matched state
+node "$WF/scripts/state-shot.js"    "<ref-url|file://…>" ref-cache/…/{sec}   1440 "{refSel}"   "base,auto,scroll:40" 0 9271
+node "$WF/scripts/state-shot.js"    "<published-url>"    built/{sec}          1440 "{builtSel}" "base,auto,scroll:40" 0 9272
+node "$WF/scripts/motion-verify.js" "<published-url>"    built/{sec}-motion.json 1440 "{builtSel}" all 0 9262
+node "$WF/scripts/pixel-diff.js"    ref-cache/…/{sec}-hover-x.png built/{sec}-hover-y.png     # one score per matched state
 ```
 
 Match states by visual role AND position (reference `.btn` ↔ built `.hero__cta`; repeated blocks: same index — `auto` hovers the FIRST match on each side, so compare card 1 to card 1). Never by selector name.
@@ -124,7 +129,21 @@ Match states by visual role AND position (reference `.btn` ↔ built `.hero__cta
 - [ ] **Pseudo-element children present** (T2 rows): the reference's `::before`/`::after` visuals appear in the built shots — a missing glow/underline/shape is a visible diff even at high base score
 - [ ] **Canvas/T4 rows actually run** in the published page (motion JSON shows movement inside the embed's wrapper), and their parameters match §C.4 capture — a frozen or "similar" canvas FAILS
 
-Reference could not be run (`reference-not-run`) → this gate degrades to: manifest rows verified individually on the built page (motion-verify + state shots on the built side only), and the report says the reference baseline was unavailable. It is never silently skipped.
+**`reference-not-run` IS A PROVEN FAILURE, NOT A CHOICE (v1.9.0).** This waiver disables the hardest gate in the system, so it costs evidence: paste the exact command you ran and the exact error it returned, **then retry once through a local static server** — `python3 -m http.server 8765 --directory <ref-folder>` then `http://localhost:8765/<file>.html` (fixes the majority of `file://` failures: module scripts, CORS-blocked fetches, absolute `/asset` paths). Only if that retry also fails, with its output shown, may the row be marked `reference-not-run`. Then the gate degrades to: manifest rows verified individually on the built page (motion-verify + state shots on the built side only), and the report states the baseline was unavailable **and why, in the tool's words**. A bare "reference wouldn't run" is an unverified claim = FAIL.
+
+## 1.9 A11Y + PERF GATE (scored, every section — v1.9.0)
+
+Same single publish, same browser session as §0. One command, budget-based, fail-closed:
+
+```
+node "$WF/scripts/page-audit.js" <published-url> built/{sec}-audit.json 1440 "{builtSel}" 0 9281
+node "$WF/scripts/page-audit.js" <published-url> built/{sec}-audit-390.json 390 "{builtSel}" 1 9282   # touch targets + mobile type
+```
+
+Hard FAIL: text contrast <4.5:1 (<3:1 for ≥24px or ≥18.66px bold) · an interactive element with no accessible name · an interactive element not keyboard-reachable · heading level skipped or >1 `h1` · `img` with no `alt` attribute · a single image >300KB or >1.8MB total · DOM depth >32 · Lottie/JSON >500KB · CLS >0.1 · at mobile widths any touch target <44px.
+Warn (fix if cheap, always reported): image served >2.5× its displayed width · DOM >1500 nodes · long tasks >200ms.
+
+Budgets are overridable per project — `--budget imageKB=200,domDepth=28` — and any override is stated in the report. Contrast pairs the measurement cannot resolve (text over a gradient or image) come back as `contrastSkipped`: check those visually in §3 and say so; "unmeasurable" is never "passed". Every failure names the element, so the fix is targeted, native, and re-scored in the same fix pass as the pixel diffs.
 
 ## 2. Property diff — SPEC-DRIVEN, not catalog-driven (v1.8.0)
 
@@ -144,13 +163,22 @@ LIGHT tier = sets 2+3 only, plus the spec's layout/type/color values. FULL tier 
 
 **Pre-check (from the RENDER IS GROUND TRUTH rule):** the reference render was studied BEFORE building — per-char gradients, blurs, shadows, overlaps, wrap points are already in the spec. Verify each of those flagged features explicitly here; values-only diff misses them.
 
-**Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node docs/memory/webflow/pixel-diff.js <reference.png> <built.png>` → prints mismatch %. **PASS line: ≥97% pixel match** (antialiasing + font-hinting tolerance built in; both images at same width first). Score < 97% → list concrete regions from the diff heatmap output → fix pass. Score can't be computed (size mismatch, blank capture) → fix the capture, never skip the score. Published-page shot (not snapshot) for the scored compare when typography is involved — snapshot lies about fonts (§0).
+**Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node "$WF/scripts/pixel-diff.js" <reference.png> <built.png>` → prints an `EVIDENCE pixel-diff` block. **Three independent PASS conditions, all required (v1.9.0, fail-closed):**
+1. **global match ≥97%** (antialiasing + font-hinting tolerance built in; both images normalized to the same width by area-average downscale),
+2. **height delta ≤2%** — a section that is 200px too tall used to PASS because the diff cropped it away; it now FAILs,
+3. **no 12×12 grid cell >25% mismatched** — one destroyed component inside a big section stays under the 3% global budget; it now FAILs by region even at 98.5% global.
+
+Any one of the three failing = FAIL → read the named regions → fix pass. Score can't be computed (size mismatch, blank capture) → fix the capture, never skip the score. Published-page shot (not snapshot) for the scored compare when typography is involved — snapshot lies about fonts (§0).
+
+**EVIDENCE RULE — the score is the tool's output, never your sentence.** The `EVIDENCE pixel-diff` block is pasted verbatim into the report (§5). A report carrying a number without the block is not a passed gate, it is an unverified claim; the same applies to `page-audit`, `state-shot` and `motion-verify` output. Regression suite for the gate itself: `node "$WF/scripts/pixel-diff.test.js"` (5 cases, must stay green after any change to the differ).
 
 **Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good." Visual catches what property diff misses: per-char styling, font rendering, color profile, image quality, balance, shadow softness, gradient smoothness.
 
 ## 4. Fix pass (batched, convergent)
 
 Collect ALL diffs → ONE batched fix call → re-check ONLY changed items + 3-5 neighbors (never the whole section). Loop while each pass closes ≥1 diff; 2 consecutive no-progress passes = STALLED → report. Recurring diff across 2 passes = wrong property name/format for Webflow — fix format, not value. New diff introduced → revert, alternative approach. Priority: CRITICAL → MAJOR → MINOR → COSMETIC.
+
+**STALLED IS NOT AN EXIT DOOR (v1.9.0).** STALLED is **illegal while any CRITICAL or MAJOR diff is open** — that state is FAIL, and FAIL means keep working or rebuild, not report-and-leave. STALLED is reachable only for MINOR/COSMETIC remainders or a documented impossible case, and only with, per remaining diff: the exact property/region, **what was attempted in each of the two passes**, why it did not move, the artifact path (diff PNG / audit JSON) that proves it, and what would resolve it (Designer step, asset re-export, platform limit). A STALLED report without that per-diff evidence is an unverified claim, treated as FAIL.
 
 Can't close: unsupported property → impossible_cases.md + alternative · API can't set → pending_designer_work.md · value right but visual wrong → Webflow rendering bug, flag to user.
 
@@ -169,13 +197,21 @@ EFFECTS      N/N manifest rows resolved — built: E1,E2 · interactions-queued:
 BEHAVIOUR    [HTML/URL ref] states scored: base NN.N% · hover ×n NN.N% · scroll NN.N% · click/focus NN.N%
              hover-delta present n/n · timing ✓ (declared vs reference) · triggers ✓ · jank 0 · canvas running ✓
              | reference-not-run: [reason] → built-side measurement only
-VISUAL       pixel-score: NN.N% (≥97 = PASS) · render-features verified: [gradients/blurs/overlaps checked]
+VISUAL       pixel-score: NN.N% (≥97) · height delta N.N% (≤2) · hot regions: none|[list] · render-features verified: [gradients/blurs/overlaps]
              human: confirmed/unconfirmed
+A11Y/PERF    contrast n/n · named+reachable n/n · headings ✓ · alt n/n · images NKB · DOM depth N · CLS N.NN   → PASS|FAIL
+PUBLISHES    N (max 2) · unverified states: none | [elements past the auto cap]
+EVIDENCE     ```
+             <verbatim EVIDENCE pixel-diff block>
+             <verbatim EVIDENCE page-audit block>
+             ```
 IMPOSSIBLE   none | [list + native alternative]
 VERDICT      PASS → responsive-pass | STALLED → [each diff + reason + resolution] | FAIL → rebuild
 ```
 
-NATIVE / CONTENT / ICONS / EFFECTS / BEHAVIOUR lines are hard gates and come first — an unauthorized embed, one placeholder string, one broken icon, one unresolved effect row, or one dead hover never reaches PASS regardless of pixel score. Only PASS (or accepted PARTIAL) proceeds. Append summary to build_state.json `verification_reports`.
+NATIVE / CONTENT / ICONS / EFFECTS / BEHAVIOUR / A11Y-PERF lines are hard gates and come first — an unauthorized embed, one placeholder string, one broken icon, one unresolved effect row, one dead hover, or one a11y failure never reaches PASS regardless of pixel score. **The EVIDENCE block is not optional**: a report whose numbers are not backed by the tools' own output is an unverified claim, and an unverified claim is not a PASS (§3 evidence rule). Only PASS (or accepted PARTIAL) proceeds. Append the summary to this site's `build_state.json` → `sections[].verification_report` (+ `a11y_perf`, `publishes`).
+
+**Permission wording is accounting, not vibes:** `asked-and-declined` means the user answered no. A user who never answered is `asked-no-answer → native fallback shipped: [what]`. Never record silence as a decision (agent Rule 4).
 
 ## 6. Edge cases
 

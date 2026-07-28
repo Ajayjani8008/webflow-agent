@@ -52,7 +52,7 @@ Scan for and enumerate each occurrence:
 | `filter` `backdrop-filter` `mix-blend-mode` | T1 | check support list below |
 | `transform` | T1 translate/scale · T2 for rotate (pre-rotated SVG) | |
 | `position: sticky` `IntersectionObserver` | T1 sticky · T3 reveal (panel) | |
-| `svg` `<use` `currentColor` | asset flow | run webflow-platform § SVG pre-flight on every file |
+| `svg` `<use` `currentColor` | asset flow | run webflow-platform § SVG pre-flight on each one |
 | `cursor:` `mousemove` `pointermove` custom-cursor divs | T1 `cursor` value · T3 for a follower element (mouse-move interaction) | a bespoke cursor is a feature, not decoration — never dropped |
 | `preloader` `loader` `loading` `window.onload` `DOMContentLoaded` + class toggle | T3 page-load timeline | loading/intro animation is a section of its own; log its exact sequence |
 | `.reveal` `.animate` `.is-visible` `.in-view` + `IntersectionObserver`/`scrollY` | T3 scroll-into-view | the CSS holds the from/to, the JS holds the trigger + threshold — capture both |
@@ -110,9 +110,9 @@ Open the file in the same headless Chrome used for verification and capture what
 
 ```
 REF=file:///abs/path/to/reference/index.html
-node docs/memory/webflow/ref-extract.js  "$REF" ref-cache/html/{section}-1440.json 1440 "{sectionSel}" 0 9251   # computed CSS = exact values
-node docs/memory/webflow/state-shot.js   "$REF" ref-cache/html/{section} 1440 "{sectionSel}" "base,auto,scroll:40" 0 9271  # resting + hover + scroll states
-node docs/memory/webflow/motion-verify.js "$REF" ref-cache/html/{section}-motion.json 1440 "{sectionSel}" all 0 9261       # what moves, on what trigger, for how long
+node "$WF/scripts/ref-extract.js"  "$REF" ref-cache/html/{section}-1440.json 1440 "{sectionSel}" 0 9251   # computed CSS = exact values
+node "$WF/scripts/state-shot.js"   "$REF" ref-cache/html/{section} 1440 "{sectionSel}" "base,auto,scroll:40" 0 9271  # resting + hover + scroll states
+node "$WF/scripts/motion-verify.js" "$REF" ref-cache/html/{section}-motion.json 1440 "{sectionSel}" all 0 9261       # what moves, on what trigger, for how long
 ```
 
 Products (all cached under `ref-cache/html/{section}/`, fetch-once like any other source):
@@ -120,4 +120,6 @@ Products (all cached under `ref-cache/html/{section}/`, fetch-once like any othe
 - **Reference motion fingerprint** (`-motion.json`) → per element: `moved`, `propsAnimated`, `durationDeclaredMs`, declared strings. This is the timing source of truth for §C.5 and the parity baseline for the built page.
 - **Computed CSS** → resolves variables, inheritance and cascade; use it over hand-read CSS whenever the two disagree.
 
-Read the state shots and the fingerprint BEFORE writing the manifest — they routinely surface effects no grep found (JS-injected classes, library defaults, `:hover` on a parent driving a child). Reference is unrunnable (missing assets, needs a server) → say so, fall back to static reading, and mark the manifest `reference-not-run` so verification knows the baseline is weaker.
+Read the state shots and the fingerprint BEFORE writing the manifest — they routinely surface effects no grep found (JS-injected classes, library defaults, `:hover` on a parent driving a child).
+
+**Unrunnable is a proven state, not a shrug (v1.9.0).** `file://` failing is usually fixable in one command: serve the folder — `python3 -m http.server 8765 --directory <ref-folder>` → re-run the three commands against `http://localhost:8765/<file>.html` (resolves module scripts, CORS-blocked fetches, absolute `/asset` paths). Only when the served retry also fails may the manifest carry `reference-not-run`, and it must carry **the exact command + the exact error output** with it (pixel-verify §1.8). A bare "wouldn't run" is treated as a skipped gate.

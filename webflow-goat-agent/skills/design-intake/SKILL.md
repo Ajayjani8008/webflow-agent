@@ -22,7 +22,7 @@ Cross-check: every feature visible in the render must exist in the extracted spe
 
 ## F. Figma cache (FAST PATH — check first)
 
-Read `docs/memory/webflow/figma-cache/00-manifest.json`. `status: "cached"` → use cache, ZERO Figma calls. Missing/empty → live path (§A).
+Read `$WF/sites/<site-id>/figma-cache/00-manifest.json` (`WF="$HOME/docs/memory/webflow"`; per site since v1.9.0). `status: "partial"` → the manifest lists what is actually cached: anything not in `nodes[]` is a MISS, fetch it live and update the manifest in the same pass. `status: "cached"` → use cache, ZERO Figma calls. Missing/empty → live path (§A).
 
 Reads: `03-nodes/{section}.json` (props, text, children) · `07-tokens.json` · `04-screenshots/{section}.png` · `05-assets/` · `06-components.json` · `08-build-queue.json`.
 
@@ -46,7 +46,7 @@ Output = same spec format as live path — downstream skills don't care about th
 5. **Radius** — per element, per-corner if uneven; ellipse → 50%
 6. **Effects** — shadow x/y/blur/spread/color inner/outer; layer blur; backdrop blur; visibility toggles
 7. **Borders** — width/style/color, per side; border align
-8. **Constraints/responsive** — pins/stretch; rotation, z-index, mix-blend, visibility. **MANDATORY RESPONSIVE-FRAME HUNT (never skip, never assume "desktop only"):** before building, search the file for this section's tablet/mobile counterparts — ① sibling/nearby frames whose name contains `mobile|Mobile|tablet|Tablet|sm|md|375|390|414|428|768|834|iPhone|iPad` ② frames with `absoluteBoundingBox.width` in 320-480 (mobile) / 700-900 (tablet) ③ a mobile PAGE in the file (check page list once) ④ variant of the same component with a breakpoint property. Found → cache each as `03-nodes/{section}--mobile.json` + `04-screenshots/{section}--mobile.png` and extract ALL properties (padding ×4, gaps, margins, alignment, order, font sizes, widths, hidden/shown elements, image crops) — these are exact, never derived. Not found after the hunt → record `responsive: none in design → derived` and say so in the report. Guessing mobile values while a mobile frame exists in the file = build failure.
+**A.8** **Constraints/responsive** — pins/stretch; rotation, z-index, mix-blend, visibility. **MANDATORY RESPONSIVE-FRAME HUNT (never skip, never assume "desktop only"):** before building, search the file for this section's tablet/mobile counterparts — ① sibling/nearby frames whose name contains `mobile|Mobile|tablet|Tablet|sm|md|375|390|414|428|768|834|iPhone|iPad` ② frames with `absoluteBoundingBox.width` in 320-480 (mobile) / 700-900 (tablet) ③ a mobile PAGE in the file (check page list once) ④ variant of the same component with a breakpoint property. Found → cache each as `03-nodes/{section}--mobile.json` + `04-screenshots/{section}--mobile.png` and extract ALL properties (padding ×4, gaps, margins, alignment, order, font sizes, widths, hidden/shown elements, image crops) — these are exact, never derived. Not found after the hunt → record `responsive: none in design → derived` and say so in the report. Guessing mobile values while a mobile frame exists in the file = build failure.
 9. **Images/icons** — every image + SVG; decorative vs content; export node ids; fill mode, crop
 10. **Components/variants** — repeats (Symbol ≥2×, CMS ≥3× editorial); variant states (hover/active/open); component props
 11. **Interactions** — prototype links, hover variants, transitions (type, easing, duration, trigger)

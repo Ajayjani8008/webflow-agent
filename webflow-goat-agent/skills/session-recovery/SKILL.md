@@ -1,21 +1,27 @@
 ---
 name: session-recovery
-description: Multi-session resume — read build_state.json, verify last work, detect orphans, rebuild corrupted state. Run at session start.
+description: Multi-session resume — read the site's build_state.json, verify last work, detect orphans, recover open tasks, rebuild corrupted state. Run at session start.
 ---
 
 # Session Recovery
 
-1. **Read build_state.json.** Missing/empty → fresh build, init state. Corrupted → rebuild from Designer (element_snapshot_tool).
+**State is per site (v1.9.0):** `$WF/sites/<site-id>/` where `WF="$HOME/docs/memory/webflow"` — `registry.md` · `build_state.json` · `pending_designer_work.md` · `figma-cache/` · `ref-cache/`. Shared at `$WF/`: `error_learnings.md`, `impossible_cases.md`, `scripts/`, `package.json`. New site → copy `sites/_template/` to `sites/<site-id>/`. Never write another site's files; never let another site's pending items block this one.
 
-2. **Find resume point.** Last "responsive" section → next section to build. "built" but not "verified" → run pixel-verify. "in-progress" → check DOM, complete or rebuild. recovery_point set → use that.
+1. **Read `sites/<site-id>/build_state.json`.** Missing/empty → fresh build, init from `sites/_template/build_state.json` (its `_schema` block documents every field: `sections[]` with status/node_ids/pixel_score/breakpoints/reports/a11y_perf/publishes · `tasks[]` · `snapshots[]` · `recovery_point` · `portable`). Corrupted → rebuild from the Designer (`element_snapshot_tool`) and say so in the report.
 
-3. **Verify previous work.** For each "verified"/"responsive" section: element_snapshot_tool → compare node_ids in state. Nodes missing/changed → warn, re-verify or rebuild.
+2. **Find the resume point.** Last section at `responsive` → next section. `built` but not `verified` → run pixel-verify. `in-progress` → read the DOM, complete or rebuild. `recovery_point` set → use it.
 
-4. **Detect orphans.** Compare DOM sections vs build_state sections. Orphan in DOM not in state → add or ask user. Section in state not in DOM → rebuild or remove.
+3. **Verify previous work — with a fresh read.** For each `verified`/`responsive` section: `element_snapshot_tool` → compare against the stored `node_ids`. Missing/changed → warn, re-verify or rebuild. A read identical to a pre-session read is cache-suspect → re-issue with a different query shape before concluding anything (agent Rule 5).
 
-5. **Check pending work.** Read pending_designer_work.md → surface unchecked items → don't claim complete.
+4. **Detect orphans.** DOM sections vs state sections. In DOM, not in state → add or ask. In state, not in DOM → rebuild or remove.
 
-6. **Report:** resume point, section statuses, orphans, pending items.
+5. **Check pending work — this site only.** Read `sites/<site-id>/pending_designer_work.md`; open `[critical]` items block "complete" for the sections that own them. Another site's items are never surfaced here (one un-scoped global ledger used to block every build with 17 unrelated items — that is why it is per-site now).
 
-**Auto-resume OK:** all previous sections "responsive", next has complete intake spec, no orphans, registry in sync.
-**User confirmation needed:** uncertain status, orphans detected, corrupted state rebuilt, incomplete intake spec.
+6. **Recover open tasks.** `tasks[]` holds server task ids for long operations (publish, bulk asset upload). Poll each (`tasks/get`) before assuming a publish never happened — new-spec servers have no task list to fall back on, so an id that was never stored is unrecoverable.
+
+7. **Check snapshots.** `snapshots[]` records pre-destructive captures. An entry whose rebuild never completed = work interrupted mid-destroy → restore from it or rebuild that subtree before anything else.
+
+8. **Report:** resume point · section statuses · orphans · this site's open `[critical]` items · open tasks · anything rebuilt from the Designer.
+
+**Auto-resume OK:** all previous sections `responsive`, next has a complete intake spec, no orphans, registry in sync, no open tasks.
+**User confirmation needed:** uncertain status, orphans, corrupted state rebuilt, incomplete intake spec, an open task whose result is unknown, an unfinished snapshot entry.

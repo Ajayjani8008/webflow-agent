@@ -74,9 +74,10 @@ Order: ① layout (grid cols, flex direction, display) ② typography ③ spacin
 
 **SCORED COMPARE — mandatory wherever a reference frame exists.** A mobile/tablet frame in the design is a reference render exactly like the desktop one, so it gets the same gate, not a softer checklist:
 
-1. Capture the built section at that breakpoint: `node docs/memory/webflow/shot-el.js <published-url> <out.png> <W> "<selector>" 1 <port>` — width per breakpoint (390 mobile-P, 767 mobile-L, 991 tablet), `mobile:1` for phone widths (CDP device metrics; `--window-size` does NOT set layout viewport).
+1. Capture the built section at that breakpoint: `node "$WF/scripts/shot-el.js" <published-url> <out.png> <W> "<selector>" 1 <port>` — width per breakpoint (390 mobile-P, 767 mobile-L, 991 tablet), `mobile:1` for phone widths (CDP device metrics; `--window-size` does NOT set layout viewport).
 2. Export the mobile/tablet Figma frame PNG (or read it from `04-screenshots/{section}--mobile.png`).
-3. Score: `node docs/memory/webflow/pixel-diff.js <mobile-ref.png> <mobile-built.png>` → **PASS ≥97%**, same as desktop. Both images normalized to the same width first.
+3. Score: `node "$WF/scripts/pixel-diff.js" <mobile-ref.png> <mobile-built.png>` → **PASS needs all three: ≥97% global · height delta ≤2% · no 12×12 cell >25% mismatched** (v1.9.0 strict gate, identical to desktop). Paste the `EVIDENCE pixel-diff` block into the report verbatim — a breakpoint score without its block is an unverified claim.
+   Also run the mobile a11y pass at phone width, where touch targets are actually measurable: `node "$WF/scripts/page-audit.js" <published-url> built/{sec}-audit-390.json 390 "{sel}" 1 9282` (pixel-verify §1.9 budgets).
 4. <97% → read the heatmap regions → §2.1 spacing diff on those classes → ONE batched fix → re-score. Converge; two no-progress passes = STALLED, report exact regions.
 
 No reference frame for a breakpoint → derived values, checklist verification below, and every derived value named in the report.
@@ -114,7 +115,11 @@ large:    [design | inherited — skipped if no frame]
 spacing-diff: [N/N classes within ±0.5px of mobile frame | deltas fixed: list]
 derived-values: [all derived, for user awareness]
 designer-steps-pending: [none | ledger items]
-touch-targets: [N enforced to ≥44px]
+touch-targets: [N enforced to ≥44px] · a11y@390: PASS|FAIL [failures]
+evidence: ```
+<verbatim EVIDENCE pixel-diff block per scored breakpoint>
+<verbatim EVIDENCE page-audit block @390>
+```
 ```
 
-Append summary to build_state.json `responsive_reports`.
+Append the summary to this site's `build_state.json` → `sections[].responsive_report`. Scores without their EVIDENCE blocks do not count as verified (pixel-verify §3).

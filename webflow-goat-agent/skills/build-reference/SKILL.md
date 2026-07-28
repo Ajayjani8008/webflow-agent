@@ -78,7 +78,7 @@ Read the `@keyframes` block → one panel timeline, each stop a tween on the SAM
 
 No panel equivalent at all (WebGL, physics simulation, canvas particle systems) → T4, stated as such. Path morph, split-text and scroll-scrub ARE panel features — never route them to code.
 
-### T4 — contained code (canvas & JS-driven only)
+### Ladder T4 — contained code (canvas & JS-driven only)
 
 **Eligibility ≠ authorization.** The canvas/WebGL set below is the ONLY code-eligible category — but eligibility just earns the right to *ask*. Before writing a single line:
 
@@ -206,4 +206,4 @@ Same element type = same timing site-wide (registry `## Interactions`). Touch ig
 
 ## Impossible cases
 
-Single source of truth: `docs/memory/webflow/impossible_cases.md`. Log new cases there with native alternative. Never force.
+Single source of truth: `$WF/impossible_cases.md` (shared across sites; `WF="$HOME/docs/memory/webflow"`). Log new cases there with native alternative. Never force.
