@@ -1,0 +1,8 @@
+{
+  "name": "webflow-goat-verification",
+  "version": "1.9.0",
+  "private": true,
+  "description": "Headless verification scripts for the Webflow GOAT agent (screenshots, pixel diff, motion + a11y/perf audits).",
+  "scripts": { "lint-pack": "node scripts/wf-lint.js" },
+  "dependencies": { "pixelmatch": "^6.0.0", "pngjs": "^7.0.0", "ws": "^8.18.0" }
+}
