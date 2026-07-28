@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.8.0
+# Webflow GOAT Agent — Backup v1.9.0
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -20,6 +20,20 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.9.0 changes (since v1.8.2) — the evidence layer, built
+
+The rules were sound; what they pointed at often did not exist, and several gates could be passed by prose. This release makes the gates fail-closed and gives them real files to stand on. No existing rule was weakened.
+
+**State is per site** — `~/docs/memory/webflow/sites/<site-id>/{registry.md, build_state.json, pending_designer_work.md, figma-cache/, ref-cache/}`; shared `impossible_cases.md`, `error_learnings.md`, `scripts/`, `package.json` at the root. `build_state.json` (17 references) had never existed; `registry.md` was a 263-byte stub missing all 12 sections the rules grep, so the recipe library never matched and the custom-code whitelist had nothing to check. One global pending ledger held 17 items from a single 2026-07-03 build and permanently blocked "complete" on every other site — now impossible.
+
+**Verification is fail-closed.** `pixel-diff.js` fails on three independent conditions, not one: global <97%, **height delta >2%** (a section 200px too tall used to PASS — the differ cropped it and printed a note), and **any 12×12 cell >25% mismatched** (a destroyed component used to PASS at 98.5% global). Resampling switched to area-average so type-heavy sections are not punished for noise. `pixel-diff.test.js` holds all five cases green.
+
+**New scored gate: accessibility + performance** — `page-audit.js` (pixel-verify §1.9) in the same browser session: contrast, accessible names, keyboard reach, heading order, alt, image weight, DOM depth, Lottie weight, CLS, 44px touch targets. Its first run on a real published page found 7 genuine 3.86:1 contrast failures that every previous pixel-perfect pass had scored PASS.
+
+**Loopholes closed:** reports must paste the tool's verbatim `EVIDENCE` block (a number in prose is not a measurement) · STALLED is illegal while a CRITICAL/MAJOR diff is open · LIGHT depth must show its qualifying checklist · `reference-not-run` needs the command, the error, and a retry through a local static server · `state-shot.js` reports unhovered interactive elements as `unverifiedStates` instead of ignoring them · snapshot required before any destructive call (there is no undo API) · T0 micro-edits get a shot, and a mobile shot when they touch layout · hybrid sources are legal once roles are declared · Rule 17 inference never overrides a source (no invented motion on a static design) · one verification re-publish allowed, capped at 2 per section.
+
+**Infrastructure:** scripts moved to `$WF/scripts/` with an absolute root (relative paths silently degraded every gate to prose when run from another directory) and pinned deps via `npm install` — `--no-save` had already pruned `ws` once. New `wf-lint.js` validates that every file, registry section, skill and cross-reference the pack names actually exists (baseline 7 errors / 9 warnings → **0 / 0**), and `wf-sync.sh` keeps the live pack and this repo checksum-identical.
 
 ## v1.8.0 changes (since v1.7.1) — performance audit applied, accuracy gates untouched
 

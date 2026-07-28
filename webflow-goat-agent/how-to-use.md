@@ -60,6 +60,11 @@ Read exact values → build native elements + classes → verify against source 
 - **Figma changed after caching?** Say "re-run figma-setup" — cache is a snapshot.
 - **Animations?** Describe the motion or give a reference site. Hover/transitions build now; scroll/load animations = Designer work (pending list).
 
-## Files it keeps (in `docs/memory/webflow/`)
+## Files it keeps (in `~/docs/memory/webflow/`, per site since v1.9.0)
 
-`registry.md` classes/variables/pages · `build_state.json` resume point · `pending_designer_work.md` your manual to-do · `impossible_cases.md` what Webflow can't do natively.
+Per site, under `sites/<site-id>/`: `registry.md` classes/variables/pages · `build_state.json` resume point · `pending_designer_work.md` **your manual to-do for that site only** (a different site's leftovers can no longer block this one) · `figma-cache/` + `ref-cache/` fetched sources.
+Shared at the root: `impossible_cases.md` what Webflow can't do natively · `error_learnings.md` dated lessons · `scripts/` the verification tools.
+
+**Checks it runs on every section (v1.9.0):** pixel score ≥97% **and** height within 2% **and** no single region >25% wrong · accessibility + performance (contrast, keyboard, headings, alt, image weight, layout shift, 44px touch targets) · behaviour parity for hover/scroll/load. Every number in its report is pasted straight from the tool, so you can check it yourself — a score without that block means it wasn't measured.
+
+**Health check any time:** `node ~/docs/memory/webflow/scripts/wf-lint.js` (are the agent's own rules pointing at real files?) · `bash ~/docs/memory/webflow/scripts/wf-sync.sh` (is the git copy up to date?).
