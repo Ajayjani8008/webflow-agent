@@ -21,9 +21,9 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 
 **`element_snapshot_tool` DOES NOT LOAD CUSTOM WEB FONTS (verified 2026-07-12).** Custom fonts render as serif fallback — mangled-Times H1 = snapshot artifact, NOT a bug. Before "fixing" a font mismatch: confirm font installed (`data_fonts_tool`) + class `font-family` correct — both right = tool lying. **Never restyle typography off the snapshot.** Typography + anything font-metric-dependent (wrapping, line count, overflow) → verify against PUBLISHED page only.
 
-**PUBLISH ONCE.** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once for final typography + responsive sign-off (all breakpoints in one publish). Re-publish only if that pass finds a real defect.
+**PUBLISH ONCE — one publish serves every published-page check.** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once, then in ONE browser session capture: final typography shot · behaviour-parity states (§1.8 `state-shot.js`) · motion fingerprint (`motion-verify.js all`) · every breakpoint shot responsive-pass §6 needs. Score them together. Re-publish only if that combined pass finds a real defect — a second publish for "the mobile shots" or "the hover shots" is a process bug, not thoroughness.
 
-**Published shots:** `node docs/memory/shot-el.js <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (needs `ws`: `npm i ws pngjs pixelmatch --no-save` at home dir; unique port per run).
+**Published shots:** `node docs/memory/webflow/shot-el.js <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (needs `ws`: `npm i ws pngjs pixelmatch --no-save` at home dir; unique port per run).
 
 **Interaction states:** `node docs/memory/webflow/state-shot.js <url> <outPrefix> <W> "<sel>" "base,auto,scroll:40,click:.tab" <mobile> <port>` (lives beside the other verify scripts — `shot-el.js`, `pixel-diff.js`, `motion-verify.js`, `ref-extract.js`) — resting + hover + focus + click + scrolled shots in one browser launch, on a published URL or a `file://` reference. Required for §1.8; `pixel-diff.js` scores each matched pair. (`auto` hovers up to 6 interactive descendants; name selectors explicitly when the auto set misses one.)
 - **Clip to element's bounding box, NOT `{x:0,y:0}`** — CDP clip is PAGE-origin; fixed `y:0` captures blank page top. ~5-6KB PNG = blank capture → wrong clip or unpublished/opacity-hidden page.
@@ -60,7 +60,7 @@ Read every text node + image binding in the built subtree and FAIL on any hit:
 - [ ] **Verbatim check:** each string character-for-character vs source (punctuation, casing, `&`, dashes, superscripts, non-breaking spaces). Re-worded, shortened, or "cleaned up" copy = FAIL
 - [ ] **Images:** every `Image` bound to an uploaded asset id — no Webflow placeholder asset (`placeholder.*.svg`), no `example.com`, no random stock, no hotlinked source URL
 - [ ] **Alt text:** real and specific per image (from source), never empty on content images, never the filename
-- [ ] **Counts:** N text nodes / N images in reference == N built (a dropped list item or missing eyebrow line is an omission, Rule 12)
+- [ ] **Counts:** N text nodes / N images in reference == N built (a dropped list item or missing eyebrow line is an omission, rule NOTHING SILENTLY OMITTED)
 
 Placeholder allowed ONLY where the user explicitly said so — logged in the spec `unknowns` as user-approved.
 
@@ -70,7 +70,7 @@ Per `Image` element carrying an SVG:
 
 - [ ] Bound via `set_image_asset` **asset id** — never `src` attribute / raw CDN URL
 - [ ] Asset URL returns HTTP 200 (`curl -sI` or fetch); 403/404 → re-upload
-- [ ] Source file has `viewBox` (build-reference § SVG pre-flight) — missing = collapses or won't scale
+- [ ] Source file has `viewBox` (webflow-platform § SVG pre-flight) — missing = collapses or won't scale
 - [ ] Class sets explicit size (`width`+`height`, or `width:100%`+`max-width`) — never size-less
 - [ ] `flex-shrink: 0` when inside a flex row (else squashed to 0 on narrow viewports)
 - [ ] Colors baked in the file (no `currentColor`, no CSS-dependent fill) and match the reference hex
@@ -81,7 +81,7 @@ Per `Image` element carrying an SVG:
 
 Any fail → fix at source (re-export/repair SVG → re-upload → re-bind), never by adding CSS hacks. Log unrepairable cases (e.g. gradient-stroke icon) to impossible_cases.md with the chosen fallback.
 
-## 1.7 EFFECT COMPLETENESS GATE (anti-simplification, Rule 12)
+## 1.7 EFFECT COMPLETENESS GATE (anti-simplification, rule NOTHING SILENTLY OMITTED)
 
 Walk the intake `effects:` manifest row by row. Every row must resolve to exactly one:
 
@@ -98,7 +98,7 @@ Row with no status, or an effect visible in the reference that never entered the
 
 ## 1.8 BEHAVIOUR PARITY GATE (HTML / live-URL references — the "it looks right but does nothing" gate)
 
-A static-only match is not a match. Whenever the reference is runnable (HTML delivery or live URL — intake §C.6 / url-intake), the built page is measured in the SAME states as the reference and the two are compared, not described.
+A static-only match is not a match. Whenever the reference is runnable (HTML delivery or live URL — html-intake §C.6 / url-intake), the built page is measured in the SAME states as the reference and the two are compared, not described.
 
 **Capture both sides identically** (same widths, same state list, unique ports):
 
@@ -109,7 +109,7 @@ node docs/memory/webflow/motion-verify.js "<published-url>"    built/{sec}-motio
 node docs/memory/webflow/pixel-diff.js    ref-cache/…/{sec}-hover-x.png built/{sec}-hover-y.png     # one score per matched state
 ```
 
-Match states by visual role (reference `.btn` ↔ built `.hero__cta`), not by selector name.
+Match states by visual role AND position (reference `.btn` ↔ built `.hero__cta`; repeated blocks: same index — `auto` hovers the FIRST match on each side, so compare card 1 to card 1). Never by selector name.
 
 - [ ] **Every hover/focus/active state in the manifest has a state shot on both sides**, scored ≥97% like the resting shot. Missing state on the built side = the effect was not built, regardless of the base score
 - [ ] **Hover DELTA exists:** built `base ↔ hover` differs in the same regions the reference's `base ↔ hover` differs. Identical base/hover on the built side = dead hover (transition on the wrong class, or state never set)
@@ -122,26 +122,25 @@ Match states by visual role (reference `.btn` ↔ built `.hero__cta`), not by se
 
 Reference could not be run (`reference-not-run`) → this gate degrades to: manifest rows verified individually on the built page (motion-verify + state shots on the built side only), and the report says the reference baseline was unavailable. It is never silently skipped.
 
-## 2. Property diff (FULL tier — LIGHT uses spot-check list from §T)
+## 2. Property diff — SPEC-DRIVEN, not catalog-driven (v1.8.0)
 
-Per class, read back applied styles, diff value-by-value: font-family/weight/size/line-height/letter-spacing · color/background-color · background-image (gradient stops+angle) · display/flex-direction/flex-wrap · justify-content/align-items/align-self · gap (both longhands) · padding ×4 · margin ×4 · width/max-width/min-width/height · border-radius ×4 corners · border (width/style/color per side) · box-shadow (x/y/blur/spread/color/inset) · opacity · filter · object-fit/position · position/top/right/bottom/left · z-index · overflow · text-align/decoration/transform · white-space/word-break/overflow-wrap.
+Read back only what can actually be wrong. Three sets, nothing else:
 
-**False-positive rules:**
-1. Absent but inherited (color, font-family) → check parent; correct there = PASS "inherited"
-2. Variables count as resolved value — resolve, then compare
-3. Don't flag Webflow defaults (`box-sizing: border-box` always on)
-4. Final computed value matters, not which class carries it
-5. Tolerance: ±0.5px lengths, ±0.01 opacity, exact colors/integers
-6. Gradients: compare stops + angle, not string format
-7. Shorthand vs stored longhands: compare resolved values
+1. **Every property in the intake spec** for that class — you set it, so you verify it. This is the whole diff for most classes.
+2. **Inheritance-risk set** (silently wrong even when never set): `color`, `font-family`, `font-weight`, `line-height` — check the class, then the parent chain.
+3. **Webflow-trap set** (the properties this platform loses): `grid-column-gap` + `grid-row-gap` (both longhands, flex included) · all 4 `border-radius` corners · width strategy (`width` vs `width:100%`+`max-width`) · `padding-*`/`margin-*` sides that a shorthand would have swallowed · `box-shadow` layer count · `background-image` gradient stops+angle · `transition-*` longhand triple where a hover exists · `position`+offsets on anything absolute/sticky.
+
+Not in any of the three sets and not visibly wrong in the shot → **do not read it back**. The visual score (§3) is the backstop; re-reading 40 properties per class to confirm defaults is the waste this replaces. Anything the heatmap flags gets read back regardless of set membership.
+
+LIGHT tier = sets 2+3 only, plus the spec's layout/type/color values. FULL tier = all three sets in full, and always for section 1, heroes, forms/sliders/tabs/navbar, anything the user flagged.
 
 **Severity:** CRITICAL (wrong element/text/missing/layout direction) → must fix · MAJOR (wrong color/font-size/spacing >5px/missing shadow) → must fix · MINOR (≤1px off) → fix if budget, flag · COSMETIC (sub-pixel) → note only.
 
 ## 3. Visual compare (mandatory every section — the accuracy gate)
 
-**Pre-check (from intake Rule 1):** the reference render was studied BEFORE building — per-char gradients, blurs, shadows, overlaps, wrap points are already in the spec. Verify each of those flagged features explicitly here; values-only diff misses them.
+**Pre-check (from the RENDER IS GROUND TRUTH rule):** the reference render was studied BEFORE building — per-char gradients, blurs, shadows, overlaps, wrap points are already in the spec. Verify each of those flagged features explicitly here; values-only diff misses them.
 
-**Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node docs/memory/pixel-diff.js <reference.png> <built.png>` → prints mismatch %. **PASS line: ≥97% pixel match** (antialiasing + font-hinting tolerance built in; both images at same width first). Score < 97% → list concrete regions from the diff heatmap output → fix pass. Score can't be computed (size mismatch, blank capture) → fix the capture, never skip the score. Published-page shot (not snapshot) for the scored compare when typography is involved — snapshot lies about fonts (§0).
+**Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node docs/memory/webflow/pixel-diff.js <reference.png> <built.png>` → prints mismatch %. **PASS line: ≥97% pixel match** (antialiasing + font-hinting tolerance built in; both images at same width first). Score < 97% → list concrete regions from the diff heatmap output → fix pass. Score can't be computed (size mismatch, blank capture) → fix the capture, never skip the score. Published-page shot (not snapshot) for the scored compare when typography is involved — snapshot lies about fonts (§0).
 
 **Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good." Visual catches what property diff misses: per-char styling, font rendering, color profile, image quality, balance, shadow softness, gradient smoothness.
 
@@ -178,11 +177,11 @@ NATIVE / CONTENT / ICONS / EFFECTS / BEHAVIOUR lines are hard gates and come fir
 
 | Case | Verify |
 |---|---|
-| Gradient text | background-clip: text — API can't set (build-reference § style tool limits) → fallback color + ledger |
+| Gradient text | background-clip: text — API can't set (webflow-platform § data_style_tool limitations) → fallback color + ledger |
 | Backdrop blur | backdrop-filter present, radius matches |
 | Per-corner radius | each corner longhand individually |
 | Nested flex | parent AND child flex props independently |
 | Sticky | position: sticky + offset; behavior needs scroll |
-| Forms | input styles separate from form layout; see build-reference § Form gotchas |
+| Forms | input styles separate from form layout; see webflow-platform § Native form gotchas |
 | Video | poster + play overlay positioning |
 | Rich text | heading/paragraph styles inside container cascade differently |

@@ -1,6 +1,20 @@
-# Webflow GOAT — How To Use (v1.1.2)
+# Webflow GOAT — How To Use (v1.8.0)
 
 One agent, everything inline. You give a design source + target page, it builds pixel-perfect native Webflow. This doc = the whole manual.
+
+## How big a job gets how much process (v1.8.0)
+
+The agent picks a lane before it loads anything, so small asks stay small:
+
+| You say | Lane | What it does |
+|---|---|---|
+| "make the CTA blue", "16px gap", "fix this typo" | T0 | changes it, reads back proof, one shot of that element. No intake, no scoring sweep |
+| "build this hero from Figma/HTML" | T1 | full pipeline: intake → native build → pixel-verify → responsive |
+| "build the whole page" | T2 | T1 per section, section 1 verified first, one publish for the batch |
+| "the hero broke on mobile", "the animation doesn't fire" | T3 | evidence first (reads the real state before theorising), fixes at that layer only |
+| "audit my classes", "set up the CMS schema" | T4 | read-back + report, no pixel scoring (nothing visual changed) |
+
+Small task feeling slow or over-processed? Say "T0" or "just change it" and it stays in the fast lane.
 
 ## Start a build (pick your source — say it naturally)
 

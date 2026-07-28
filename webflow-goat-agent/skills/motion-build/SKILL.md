@@ -5,7 +5,7 @@ description: Animation/interaction engine for Webflow — turn any motion refere
 
 # Motion Build — the animation engine
 
-Claude reads the reference and decides WHAT the motion is. This skill decides which NATIVE surface carries it, what the user clicks, and how it is proven. Nothing simplified, nothing dropped (agent Rule 13).
+Claude reads the reference and decides WHAT the motion is. This skill decides which NATIVE surface carries it, what the user clicks, and how it is proven. Nothing simplified, nothing dropped (agent rule NOTHING SILENTLY OMITTED).
 
 ## Hard platform facts (verified 2026-07-25 — do not re-litigate, do not "improve on")
 
@@ -28,7 +28,7 @@ Per source:
 - **Video / GIF / screen recording** → count frames for real timing (`ffprobe` / frame extraction when available): start→end frame per move → ms; easing from frame spacing (even = linear, back-loaded = ease-out). Never eyeball a duration when frames exist.
 - **Live URL** → the CSS/JS is the spec: grep stylesheets for `@keyframes`/`animation:`/`transition:`; grep JS for `gsap.`/`ScrollTrigger`/`IntersectionObserver`/`requestAnimationFrame`. Record real numbers (durations, eases, stagger, scrub ranges). **A reference site using GSAP-by-code is still rebuilt in the native panel** — same engine, native surface.
 - **GSAP / CSS code pasted** → read it literally; every tween, ease, stagger and ScrollTrigger config maps onto a panel control. Translate, never transplant.
-- **HTML delivery (files on disk)** → the CSS/JS is the spec AND the reference is runnable: read every stylesheet/script in full (design-intake §C.0), then run it headless via `file://` — `motion-verify.js` for the reference fingerprint (what moves, declared durations, triggers) and `state-shot.js` for hover/scroll state images (design-intake §C.6). Library-driven motion (GSAP/AOS/Swiper/Lottie/particles) is routed by design-intake §C.2b; the fingerprint becomes the parity baseline pixel-verify §1.8 scores against. Never re-inject the reference's library.
+- **HTML delivery (files on disk)** → the CSS/JS is the spec AND the reference is runnable: read every stylesheet/script in full (html-intake §C.0), then run it headless via `file://` — `motion-verify.js` for the reference fingerprint (what moves, declared durations, triggers) and `state-shot.js` for hover/scroll state images (html-intake §C.6). Library-driven motion (GSAP/AOS/Swiper/Lottie/particles) is routed by html-intake §C.2b; the fingerprint becomes the parity baseline pixel-verify §1.8 scores against. Never re-inject the reference's library.
 - **Figma prototype** → `get_motion_context` / prototype links: trigger, transition type, duration, easing, smart-animate pairs.
 
 **Output = Motion IR, one line per animation** (in the intake spec beside `effects:`):
@@ -150,4 +150,4 @@ RECIPES      reused: [names] · new: [names added]
 DERIVED      [values the reference didn't specify]
 ```
 
-Unproven or unapplied rows keep the section at `partial` — never "complete" (agent Rules 10/12).
+Unproven or unapplied rows keep the section at `partial` — never "complete" (agent rules IMPOSSIBLE CASES / NOTHING SILENTLY OMITTED).

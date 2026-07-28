@@ -5,7 +5,7 @@ description: One-time Figma fetch + local cache. SCOPED by default (only section
 
 # Figma Setup — Fetch + Cache
 
-Command: `/figma-setup <figma-url>` → saves to `docs/memory/figma-cache/`. Different URL for one-off task → don't cache, work directly.
+Command: `/figma-setup <figma-url>` → saves to `docs/memory/webflow/figma-cache/`. Different URL for one-off task → don't cache, work directly.
 
 ## Scope (decide first — don't over-fetch)
 

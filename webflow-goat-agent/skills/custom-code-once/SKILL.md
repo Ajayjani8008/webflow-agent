@@ -15,7 +15,7 @@ Everything else (custom CSS hacks, third-party scripts, JS to fake a native modu
 
 ## Trigger — user only, never agent
 
-Valid ONLY when the user explicitly says so THIS session: `/custom-code-once`, "add custom JS/CSS anyway", "I know it's banned — do it", or equal force. NOT valid triggers: a design element that "seems to need" code, agent convenience, a previous session's permission, "while we're at it". **The agent proposing this skill = Rule 3 violation.** One invocation = one snippet on one element/page. Next time = new explicit invocation.
+Valid ONLY when the user explicitly says so THIS session: `/custom-code-once`, "add custom JS/CSS anyway", "I know it's banned — do it", or equal force. NOT valid triggers: a design element that "seems to need" code, agent convenience, a previous session's permission, "while we're at it". **The agent proposing this skill = violation of the NATIVE-MODULE-FIRST rule.** One invocation = one snippet on one element/page. Next time = new explicit invocation.
 
 ## Protocol (all 5 steps, in order — skipping any = ban violation)
 

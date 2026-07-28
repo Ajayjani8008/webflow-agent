@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.7.1
+# Webflow GOAT Agent — Backup v1.8.0
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -12,7 +12,7 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 |---|---|---|
 | `agents/webflow-goat.md` | `~/.claude/agents/webflow/` (agent mode) — or its BODY (below the frontmatter) to `~/CLAUDE.md` (standalone mode) | THE agent brain, single source of truth: rules, workflow, batching, source routing, portable mode, "never" list |
 | `CLAUDE.md` | repo/pack root only | Thin router pointing to the agent file — NOT the brain anymore (v1.2.0 dedup); do not restore as `~/CLAUDE.md` |
-| `skills/*` | `~/.claude/skills/` | 9 lazy skills: build-reference, design-intake, figma-setup, pixel-verify, responsive-pass, session-recovery, **url-intake (new)**, **custom-code-once (new)**, **webflow-help (new)** |
+| `skills/*` | `~/.claude/skills/` | 15 lazy skills: design-intake (Figma/screenshot) · **html-intake (new v1.8.0)** · url-intake · figma-setup · build-reference · **webflow-platform (new v1.8.0)** · **component-build (new v1.8.0)** · **cms-build (new v1.8.0)** · motion-build · pixel-verify · responsive-pass · **portable-mode (new v1.8.0)** · session-recovery · custom-code-once · webflow-help |
 | `how-to-use.md` | anywhere user-readable (also `~/docs/memory/webflow/`) | Human manual — never loaded by the agent during builds |
 | `docs-memory/*` | `~/docs/memory/webflow/` | registry.md (fresh single-file template), pending_designer_work.md, impossible_cases.md, error_learnings.md (incl. merged v5 lessons), scripts: shot.js / shot-el.js / ref-extract.js / pixel-diff.js / motion-verify.js / **state-shot.js (new v1.7.0 — interaction-state shots for behaviour parity)** |
 | `rules/webflow-core.md` | `~/.claude/rules/webflow/core.md` | 8-line GOAT router (replaces retired 85-line v5 orchestrator) |
@@ -20,6 +20,28 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.8.0 changes (since v1.7.1) — performance audit applied, accuracy gates untouched
+
+Measured before/after (approx tokens of instructions loaded):
+
+| Job | v1.7.1 | v1.8.0 |
+|---|---|---|
+| micro-edit ("make the CTA blue") | 28,261 | **7,257** |
+| Figma section build | 28,261 | **21,905** (25,134 incl. platform on the session's first build) |
+| HTML build with motion | 31,428 | **27,014** |
+| debug one broken breakpoint | ~28,000 | **9,457** |
+
+1. **TASK LANES table at the top of the agent** — T0 micro-edit (no skills; read-back proof + one snapshot) · T1 section (full pipeline) · T2 page/site · T3 debug (evidence first, only the owning skill) · T4 inspect/non-visual. Explicit escalation rule; explicit list of what never scales down (exact values, native-first, no-code-without-permission, real content, read-back evidence, pending log).
+2. **`build-reference` split** → `build-reference` (what to build: node table, ladder + recipes, Figma→CSS mapping, longhand, variables, heuristics) + new **`webflow-platform`** (MCP 2.0.1 surface, style-tool limits, SVG asset flow + pre-flight, text-node gotcha, form gotchas, REST fallback, error codes, portability traps). Platform file loads on the first build of a session, on a tool error, or when SVG/forms/components/CMS/REST enter scope.
+3. **`design-intake` split** → design-intake (Figma/screenshot) + new **`html-intake`** (the whole HTML behaviour contract, §C.0-C.6 labels preserved so every cross-reference still resolves). Enforces the source-isolation rule structurally instead of by instruction.
+4. **pixel-verify property diff is now SPEC-DRIVEN**: three sets only — every property in the spec, the inheritance-risk set, the Webflow-trap set. Reading back 40 catalogue properties per class to confirm defaults is gone; the visual score remains the backstop and anything the heatmap flags is read back regardless.
+5. **Single-publish rule made explicit**: one publish, one browser session, all published-page checks (typography + behaviour states + motion fingerprint + every breakpoint shot). A second publish for "the mobile shots" is called out as a process bug.
+6. **Bug fixes:** wrong script paths (`docs/memory/shot-el.js` → `docs/memory/webflow/…`) in agent Phase 3, pixel-verify §0 and responsive-pass §6 · figma-cache root unified under `docs/memory/webflow/` · 6 stale rule-number citations replaced with rule NAMES (immune to renumbering) · **contradiction removed**: build-reference's old "replicate intent — approximation, not pixel copy" animation block (it fought the behaviour-parity rule and duplicated ~740 tokens of motion-build) is deleted and replaced with an exact-over-intent correction.
+7. **New skills:** `component-build` (MCP 2.0.1 components/props/variants/slots — a repeated block costs ~4 calls instead of N subtree builds), `cms-build` (Collection List flow + verified hard limits promoted out of memory: colour field unbindable, one template per list, API items invisible on a stale canvas), `portable-mode` (makes the previously phantom `/portable on|off` real).
+8. **Batching note added** for MCP 2.0.1: `query_elements` takes multiple queries, `set_settings` takes `operations[]` — a verify read-back is ONE call.
+
+No gate was removed or softened: intake spec, native-module gate, ladder + permission, content, icons, effect manifest, behaviour parity, visual ≥97%, per-breakpoint score, pending ledger all unchanged.
 
 ## v1.7.1 changes (since v1.7.0) — native-first is enforced, code needs permission
 

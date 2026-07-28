@@ -1,4 +1,4 @@
-# Webflow Routing (v1.7.1 — GOAT agent system)
+# Webflow Routing (v1.8.0 — GOAT agent system)
 
 ALL Webflow work — any size, any source (Figma / screenshot / HTML / live URL / description) — is handled by the **webflow-goat** agent (`~/.claude/agents/webflow/webflow-goat.md`) or done inline following its rules. It works end-to-end inline: intake → build → pixel-verify → responsive-pass.
 
@@ -6,5 +6,6 @@ ALL Webflow work — any size, any source (Figma / screenshot / HTML / live URL 
 - v1.7.1: **code is never the agent's call** — T1→T2→T3 descent proof required in writing, then an explicit per-effect user YES before any html/css/js (canvas/WebGL is *eligible*, not pre-authorized); no answer = native fallback. `/custom-code-once` stays user-invoked only; pixel-verify fails a code hit with no proof or no recorded permission.
 
 - Do NOT use the retired v5 system: no `webflow-builder` spawns, no complexity classifier, no `~/.claude/webflow-kb/` (retired 2026-07-16 → backups; lessons merged into `docs/memory/webflow/error_learnings.md`).
-- Skills (lazy, one per need): design-intake (Figma/screenshot/HTML) · url-intake (live URL ONLY) · figma-setup · motion-build (any animation/interaction) · pixel-verify · responsive-pass · build-reference · session-recovery. Source isolation: never load the other source's skill/cache.
+- v1.8.0: **TASK LANES first** — T0 micro-edit (no skills, read-back proof only) · T1 section · T2 page · T3 debug · T4 inspect. Load per lane, never by habit.
+- Skills (lazy, one per need): design-intake (Figma/screenshot) · html-intake (HTML delivery) · url-intake (live URL ONLY) · figma-setup · build-reference (what to build) · webflow-platform (MCP surface, limits, errors — on demand) · component-build (repeats ≥2×) · cms-build (editorial ≥3×) · motion-build (animation) · pixel-verify · responsive-pass · portable-mode · session-recovery · custom-code-once (user-only) · webflow-help. Source isolation: never load the other source's skill/cache.
 - Project memory: `docs/memory/webflow/` — registry.md (single file, grep sections) · build_state.json · pending_designer_work.md (17+ open items — surface before claiming done) · impossible_cases.md · error_learnings.md.
