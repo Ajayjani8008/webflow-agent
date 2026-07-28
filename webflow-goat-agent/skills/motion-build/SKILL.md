@@ -130,6 +130,25 @@ Failure → fix at the owning tier, re-run. Two no-progress passes = STALLED, re
 
 Consistency: same animation type = same duration + easing site-wide. A second, differently-timed "card reveal" is a bug, not a variant.
 
+## Under-specified brief → build the top-tier interpretation (agent Rule 17)
+
+"Add an animation here" / "make the hero come alive" / "animate the cards" is a brief, not a spec — and it is **never** a licence to ship one 300ms opacity fade. Infer the animation a senior studio would ship for that element, write it into the IR with exact values (§ Quality defaults supply anything unstated, labelled `derived`), state the reading in ONE line — *"reading this as: hero split-in + staggered sub-copy + CTA lift, 600/500/200ms"* — and build it. Ask only when a choice changes the TIER (pin the hero? Lottie vs vector?), never to have the user pick numbers. Native is the default, so a bigger ambition means a richer native build (layered T1/T2 children + panel timeline), never code.
+
+| Element / context | Toy version (FAIL) | What to actually build |
+|---|---|---|
+| Hero heading | whole block fades in | split-in per word/line (rise 24px + fade, 500ms, 40ms stagger) → sub-copy 100ms behind → CTA lift-in; one timeline, not three unrelated fades |
+| Hero media / bg | static | scroll-scrub parallax ≤120px + a load-in scale 1.04→1 (700ms ease-out); depth = media and text move at different rates |
+| Card / feature grid | all cards fade at once | scroll-in fade+rise 24px, stagger by § Quality defaults, once, threshold 15% — **plus** a real hover: lift 2-6px + shadow deepen + icon/arrow micro-move, 200ms ease-out |
+| Nav | none | shrink/blur-on-scroll state (height + bg + shadow, 250ms), link underline/arrow micro-state, mobile menu open/close timeline |
+| Stats / numbers | plain text | count-up on scroll-in + the section's own reveal; digits ease-out, ≤1.2s |
+| Testimonials / logos | static list | native slider with real transition timing, or a seamless marquee loop (pause on hover, tab-hidden pause) |
+| Buttons / links / inputs | colour swap | multi-property micro-state: bg + translateY + shadow + inner icon shift, 150-250ms ease-out, matching focus state |
+| Section on scroll | one global fade | choreography with hierarchy — heading first, supporting content staggered behind it, media its own beat |
+| Icons / illustrations | static SVG | Lottie loop or a T2 layered element with a subtle idle/hover state where the design implies life |
+| "Make it wow / premium" | more of the same fade | depth: layered T2 children (glow, gradient border, mask), a scroll-linked beat, and per-element micro-states — all native tiers, no code |
+
+Consistency still wins over novelty (§ Recipe library): the top-tier version of a card reveal is the site's existing `stagger-cards` recipe, not a new one.
+
 ## Quality defaults (fill unstated values, label them derived)
 
 Durations: micro-state 150-250ms · entrance 400-700ms · hero 600-900ms · loop 3-6s. Easing: entrance ease-out (Quart-ish), exit ease-in, loop ease-in-out, scrub linear. Distance: reveal 16-32px, parallax ≤120px, lift 2-6px. Stagger: 2-3 items 100ms · 4-6 80 · 7-12 60 · >12 40, max 150. Scroll reveals fire once, threshold 10-20% in view. Max 3 animated properties per step. Always respect reduced motion. Loops pause when the tab is hidden.

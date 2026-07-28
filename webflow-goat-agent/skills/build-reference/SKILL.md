@@ -7,6 +7,8 @@ description: WHAT to build — native module table (module-first gate), Effect F
 
 **Scope:** what to build and how to express it natively. Platform surface, tool quirks, SVG/forms gotchas, REST fallback, error codes and portability traps moved to `webflow-platform` (v1.8.0) — load it on the first build of a session, on any tool error, or when SVG/forms/components/CMS/REST enter scope.
 
+**No-toy default (agent Rule 17).** When the brief is thin ("build a pricing section", "add a hero"), build what a senior studio ships, not the minimum that matches the words: real hierarchy and type scale, deliberate spacing rhythm, depth where the design language implies it (T2 layered children, gradients, shadows, borders), every interactive element with a full state set (`:hover`/`:focus`/active, and disabled where it exists), real content, responsive at every breakpoint. Fill gaps by assumption stated in one line, then build — never by asking the user to specify what you can infer, never by a stub. Depth of the thing asked for, never extra scope. Motion side: `motion-build` § Under-specified brief.
+
 ## Node types — NATIVE MODULE FIRST (the ONLY building blocks)
 
 **Gate: before building any pattern, find its row here. A native module exists → USE IT — building a div-imitation of it = ban-sweep FAIL (agent rule NATIVE MODULE FIRST).** Div-blocks are for layout boxes, not for re-implementing modules Webflow ships.
