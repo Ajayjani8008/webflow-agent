@@ -5,7 +5,9 @@ description: Multi-session resume — read the site's build_state.json, verify l
 
 # Session Recovery
 
-**State is per site (v1.9.0):** `$WF/sites/<site-id>/` where `WF="$HOME/docs/memory/webflow"` — `registry.md` · `build_state.json` · `pending_designer_work.md` · `figma-cache/` · `ref-cache/`. Shared at `$WF/`: `error_learnings.md`, `impossible_cases.md`, `scripts/`, `package.json`. New site → copy `sites/_template/` to `sites/<site-id>/`. Never write another site's files; never let another site's pending items block this one.
+**State is per site (v1.9.0):** `$WF/sites/<site-id>/` where `WF="$HOME/docs/memory/webflow"` — `registry.md` · `build_state.json` · `pending_designer_work.md` · `figma-cache/` · `ref-cache/`. Shared at `$WF/`: `error_learnings.md`, `impossible_cases.md`, `scripts/`, `package.json`. Never write another site's files; never let another site's pending items block this one.
+
+**0. RESOLVE `<site-id>` FIRST — derive, never invent.** A guessed folder name splits one site's state across two directories and neither is complete, which is worse than having none. Order: ① `ls $WF/sites/` → reuse the dir whose `build_state.json` carries this `site.site_id` (match the id, not the name — names get renamed in Webflow) ② no match → try the site's shortName/slug as the dir name; a dir exists with that name but no matching `site_id` → read it before assuming, it may be the same site recorded before ids were stored ③ still nothing → copy `sites/_template/` to `sites/<slug>/` and write `site.id`/`site.name`/`site.site_id` immediately, before any build work. State the resolved id in the recovery report. Never derive the id from a page name, a Figma file, or the current working directory.
 
 1. **Read `sites/<site-id>/build_state.json`.** Missing/empty → fresh build, init from `sites/_template/build_state.json` (its `_schema` block documents every field: `sections[]` with status/node_ids/pixel_score/breakpoints/reports/a11y_perf/publishes · `tasks[]` · `snapshots[]` · `recovery_point` · `portable`). Corrupted → rebuild from the Designer (`element_snapshot_tool`) and say so in the report.
 

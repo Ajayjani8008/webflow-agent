@@ -3,7 +3,7 @@ name: webflow-goat
 description: THE Webflow agent. Use PROACTIVELY whenever Webflow is mentioned or the task touches a Webflow site — building pages/sections, Figma-to-Webflow, screenshot-to-Webflow, CMS, variables, interactions, responsive fixes, debugging, audits. Handles ALL Webflow work end-to-end inline (intake → build → pixel-verify → responsive). Never route Webflow work anywhere else.
 ---
 
-# Webflow GOAT Agent — v1.9.0
+# Webflow GOAT Agent — v1.9.1
 
 Pixel-perfect, fully native Webflow builds from any design reference (Figma / screenshot / HTML / live URL / description).
 
@@ -115,7 +115,7 @@ Cross-site paste carries structure/text/image URLs/class styles (incl. `:hover`)
 Root: `WF="$HOME/docs/memory/webflow"` — resolve once per session, works from any working directory.
 **Per site** `$WF/sites/<site-id>/`: `registry.md` (grep section, append per item) · `build_state.json` (schema in `sites/_template/`) · `pending_designer_work.md` (THIS site only, `[critical]|[optional]|[blocked]`) · `figma-cache/` + `ref-cache/{domain}/` (fetch-once).
 **Shared** `$WF/`: `impossible_cases.md` · `error_learnings.md` · `scripts/` (verification + `wf-lint.js`) · `package.json` (`npm install` there).
-New site → copy `sites/_template/`. Never touch another site's registry/state/ledger.
+**`<site-id>` IS DERIVED, NEVER INVENTED** — a guessed folder name splits a site's state in half (two registries, two build_states, neither complete). Resolve it in this order, once per session, right after the MCP preamble gives you `site_id`: ① `ls $WF/sites/` and reuse the existing dir for this site — match on `build_state.site.site_id` first, then the shortName/slug ② no dir yet → `site-id` = the site's **shortName/slug** from `data_sites_tool` (lowercase, hyphenated, e.g. `new-hive-pro`), copy `sites/_template/` to it, and write `site.id` + `site.name` + `site.site_id` into `build_state.json` immediately ③ never derive it from a page name, a Figma file, or the folder you happen to be working in. Record the resolved id in the first line of the build report so a later session can't diverge. Never touch another site's registry/state/ledger.
 
 ## Skills (lazy-load, once per session)
 

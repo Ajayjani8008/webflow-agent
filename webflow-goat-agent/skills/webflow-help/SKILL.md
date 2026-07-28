@@ -5,7 +5,7 @@ description: User cheat sheet for the Webflow GOAT agent — commands, rules, qu
 
 # Webflow GOAT — Help
 
-Show the user this cheat sheet (formatted, short). Do NOT start any build action from this skill. If a full manual exists at `docs/memory/webflow/how-to-use.md` or the pack's `how-to-use.md`, mention it.
+Show the user this cheat sheet (formatted, short). Do NOT start any build action from this skill. If a full manual exists at `$WF/how-to-use.md` (`WF="$HOME/docs/memory/webflow"`) or the pack's `how-to-use.md`, mention it.
 
 ## Start a build — just say it
 
@@ -30,7 +30,9 @@ Everything else (intake, verify, responsive, resume) = automatic.
 
 ## Rules that affect you
 
-1. Never guesses — asks once when a value matters. 2. Native ladder, not "no effects": hover/filters = class styles · `::before`/`::after`/shapes = real child elements · `@keyframes`/scroll/load = IX2 spec you apply in Designer · canvas/JS-driven = contained embed, logged. Nothing gets simplified or dropped; other custom code still needs `/custom-code-once`. 3. Every section proven vs design before "done" — pixel-score ≥97% at desktop AND at each breakpoint that has a mobile/tablet frame. 4. Real content only — no lorem, no placeholder copy, no substituted images. 5. IX2/slider-init/Symbols = Designer-only → `pending_designer_work.md`, status "partial". 6. One source per build (Figma tools never mix with URL tools). 7. Crash → new session → say "resume".
+1. Never guesses — asks once when a value matters, and only about values that exist in your source; design choices the brief left open it decides at a senior-studio standard and tells you the reading in one line. 2. Native ladder, not "no effects": hover/filters = class styles · `::before`/`::after`/shapes = real child elements · `@keyframes`/scroll/load = a Designer build-script you apply · canvas/JS-driven = contained embed, and only after it asks you. Nothing simplified or dropped; other custom code still needs `/custom-code-once`. 3. Every section proven before "done" — pixel-score ≥97% **and** height within 2% **and** no single region >25% wrong, at desktop and at each breakpoint with a mobile/tablet frame. 4. Accessibility + performance are scored too (contrast, keyboard, headings, alt, image weight, layout shift, 44px touch targets) — a pretty section that fails contrast is not done. 5. Real content only — no lorem, no placeholder copy, no substituted images. 6. Designer-only work (Interactions, slider init, Symbols) → **this site's** `pending_designer_work.md`, status "partial"; another site's leftovers never block your build. 7. One source per build — or a hybrid, if it states which source owns layout and which owns behaviour. 8. Nothing is destroyed without a snapshot first. 9. Crash → new session → say "resume".
+
+**Every number it reports is pasted straight from the measuring tool.** If a report shows a score without the raw `EVIDENCE` block underneath, it wasn't measured — call that out. Same for "reference wouldn't run": the agent owes you the command and the error.
 
 ## Animation
 
@@ -48,6 +50,18 @@ First time it writes a build-script it asks for **one screenshot of your open In
 Then it MEASURES the result (`motion-verify.js`): did it actually move, is the timing right, is anything janky, does it respect reduced-motion. Unmeasured animation never counts as done. The recipe library means the second time you want "cards fade up staggered", it costs no analysis.
 
 **Give the agent a mobile frame.** If the Figma file has tablet/mobile frames it hunts for them and matches them exactly; with desktop only, mobile values are derived and it tells you which ones.
+
+## Where your work is kept (per site)
+
+`~/docs/memory/webflow/sites/<your-site>/` — `registry.md` (classes, variables, components, animations) · `build_state.json` (resume point) · `pending_designer_work.md` (**your** to-do for that site only) · cached Figma/reference files.
+Shared across sites: `impossible_cases.md` (what Webflow genuinely can't do natively) · `error_learnings.md` (dated lessons) · `scripts/` (the measuring tools).
+
+**Two health checks you can run yourself, any time:**
+```
+node ~/docs/memory/webflow/scripts/wf-lint.js     # do the agent's own rules point at real files?
+bash ~/docs/memory/webflow/scripts/wf-sync.sh     # is the git backup up to date with the live pack?
+```
+Both are read-only. `wf-lint` must say `PASS: 0 errors, 0 warnings` — anything else means a rule is silently doing nothing, and that's worth telling me about.
 
 ## Quick fixes
 

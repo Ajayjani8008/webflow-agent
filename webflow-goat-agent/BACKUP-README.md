@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.9.0
+# Webflow GOAT Agent — Backup v1.9.1
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -20,6 +20,18 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.9.1 changes (since v1.9.0) — post-release review fixes
+
+A review of v1.9.0 found four real gaps. All four are closed here.
+
+- **`<site-id>` was undefined.** Every rule said `sites/<site-id>/` but nothing said how to derive it, so a later session could invent a second folder and split one site's state in half. Now: match `build_state.site.site_id` against existing dirs first, else use the site's shortName/slug from `data_sites_tool`, seed from `sites/_template/`, and write `site.*` before any build work (agent § Memory, session-recovery step 0).
+- **The repo still carried the pre-v1.9.0 layout** — the 263-byte stub registry, the un-scoped ledger, and six OLD script copies including the *permissive* `pixel-diff.js`. Restoring from this repo would have reinstalled the exact bugs v1.9.0 fixed. Removed; the 17 real outstanding Designer items are preserved at `docs-memory/sites/hive-pro-blog/`.
+- **`wf-sync.sh` orphaned real site state.** It synced only the template, so a site's registry and pending ledger never reached the repo. It now carries the three state files for any site the repo already tracks; caches still never travel.
+- **The lint baseline was stale** (frozen at the broken 7 errors / 9 warnings), so `--compare` measured against the past. Re-cut at **0 / 0** — any future regression now shows as new.
+- **`webflow-help`** (the user cheat sheet) was a version behind: it now covers the three strict pixel conditions, the a11y/perf gate, the evidence rule, per-site state, and the two read-only health checks (`wf-lint.js`, `wf-sync.sh`).
+
+Honest note: `hive-pro-blog` is an **inferred** site name — the migrated ledger carried no site attribution, so it was derived from the Blogs collection id. Its `build_state.json` records that warning; resolve the real site before acting on those items.
 
 ## v1.9.0 changes (since v1.8.2) — the evidence layer, built
 

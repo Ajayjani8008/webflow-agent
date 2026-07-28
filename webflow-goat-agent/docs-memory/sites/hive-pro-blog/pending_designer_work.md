@@ -1,6 +1,8 @@
-# Pending Designer Work (Webflow)
+# Pending Designer Work — hive-pro-blog
 
-Tasks that cannot be completed via API and require manual action in Webflow Designer.
+Migrated 2026-07-28 from the un-scoped global ledger. Scope: THIS SITE ONLY.
+
+## Open (archive 2026-07-03 — verify against the live site before acting)
 
 ---
 

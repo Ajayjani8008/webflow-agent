@@ -32,10 +32,22 @@ for f in "$MEM"/scripts/*.js "$MEM"/scripts/*.sh; do
   [[ -e "$f" ]] || continue
   PAIRS+=("$f:$REPO/scripts/$(basename "$f")")
 done
-# the per-site template travels with the pack; real site state never does
+# the per-site template always travels with the pack
 for f in "$MEM"/sites/_template/*; do
   [[ -e "$f" ]] || continue
   PAIRS+=("$f:$REPO/docs-memory/sites/_template/$(basename "$f")")
+done
+# real sites: sync the three state files IF the repo already tracks that site, so outstanding
+# Designer work and the class registry survive a restore. Caches (figma-cache/ref-cache) never
+# travel — they are large, refetchable, and site-specific. A site the repo does not track yet
+# stays local until you `mkdir` it in the repo, so nothing is published by accident.
+for d in "$MEM"/sites/*/; do
+  site="$(basename "$d")"
+  [[ "$site" == "_template" ]] && continue
+  [[ -d "$REPO/docs-memory/sites/$site" ]] || continue
+  for n in registry.md build_state.json pending_designer_work.md; do
+    [[ -f "$d$n" ]] && PAIRS+=("$d$n:$REPO/docs-memory/sites/$site/$n")
+  done
 done
 
 sum() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
