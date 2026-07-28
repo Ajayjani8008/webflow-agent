@@ -35,7 +35,11 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 
 **POST-BATCH COUNT CHECK — after EVERY `data_element_builder` call, not just final verify.** Builder can silently duplicate a whole subtree (slow/retried bridge call → second content block, contiguous ids). Query direct-child count (depth 1-2) = what you built; duplicate/orphan → `remove_element` NOW, before styling.
 
-MCP: `element_snapshot_tool` / `data_element_tool` get. API: `GET /v2/pages/{id}/dom`. Check vs spec:
+MCP: `element_snapshot_tool` / `data_element_tool` get. API: `GET /v2/pages/{id}/dom`.
+
+**FRESH-READ RULE (applies to every server — no version check).** Read/list results can be cached, so a read-back can show pre-edit state and pass a gate on work that never landed. Every read used as done-evidence must be issued AFTER the write and must not be a byte-identical repeat of the pre-edit read of the same target — if it is, re-issue with a different query shape (`query_elements` on the touched ids rather than the cached subtree) before scoring. Verdict from a stale read = no verdict, in either direction (don't rebuild on a stale "missing" either).
+
+Check vs spec:
 - [ ] Every spec element exists, right node type (h-level, paragraph, image, link-block, native slider/tabs/form…)
 - [ ] Planned classes present (combo = base + modifier)
 - [ ] Text = exact copy, character-for-character

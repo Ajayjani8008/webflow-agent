@@ -5,7 +5,7 @@ description: Build reusable Webflow components via MCP — decide when to compon
 
 # Component Build — repeated block = ONE component with props
 
-Since MCP 2.0.1 components, props, variants and slots are fully API-buildable (`webflow-platform § MCP surface`) — this is no longer Designer work. Copying a subtree N times is now the slow, drift-prone path: N× element calls, N× style risk, N× fix passes, and the user edits N places.
+Since Webflow MCP 2.0.1 (server version — not the `2026-07-28` protocol spec) components, props, variants and slots are fully API-buildable (`webflow-platform § MCP surface`) — this is no longer Designer work. Copying a subtree N times is now the slow, drift-prone path: N× element calls, N× style risk, N× fix passes, and the user edits N places.
 
 **Trigger (from intake `elements:`):** same structure appears ≥2× and is not editorial CMS content (≥3 editorial repeats → CMS Collection List instead, `cms-build`). Also componentize a single block when it will be reused across pages, or when motion must travel with it (component-scoped Interactions copy across pages/sites — `motion-build § platform facts`).
 
