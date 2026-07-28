@@ -23,12 +23,25 @@ Run after every section build, before responsive-pass. Never skipped. **Goal: th
 
 **`element_snapshot_tool` DOES NOT LOAD CUSTOM WEB FONTS (verified 2026-07-12).** Custom fonts render as serif fallback — mangled-Times H1 = snapshot artifact, NOT a bug. Before "fixing" a font mismatch: confirm font installed (`data_fonts_tool`) + class `font-family` correct — both right = tool lying. **Never restyle typography off the snapshot.** Typography + anything font-metric-dependent (wrapping, line count, overflow) → verify against PUBLISHED page only.
 
-**PUBLISH ONCE, THEN AT MOST ONE VERIFICATION RE-PUBLISH (v1.9.0).** Publishing = slow + token cost. Interim checks = snapshot (free). Batch ALL fixes → publish once, then in ONE browser session capture: final typography shot · behaviour-parity states (§1.8 `state-shot.js`) · motion fingerprint (`motion-verify.js all`) · a11y/perf audit (§1.9) · every breakpoint shot responsive-pass §6 needs. Score them together.
+**PUBLISH ONCE, THEN AT MOST ONE VERIFICATION RE-PUBLISH (v1.9.0).** Publishing = slow + token cost. Interim checks = `element_snapshot_tool` (no publish needed — but it returns an IMAGE, so it is free of *publishing*, not free of tokens: use it when you need to SEE something, and a text read-back when you need to know a value). Batch ALL fixes → publish once, then in ONE browser session capture: final typography shot · behaviour-parity states (§1.8 `state-shot.js`) · motion fingerprint (`motion-verify.js all`) · a11y/perf audit (§1.9) · every breakpoint shot responsive-pass §6 needs. Score them together.
 That combined pass finds real defects → fix them in ONE batch → **one verification re-publish is allowed and expected**, capped at **2 publishes per section**, counted in the report and in `build_state.sections[].publishes`. Convergence outranks publish-thrift: never accept a visible defect because "we already published". What stays a process bug is publishing *per artifact* — one publish for the mobile shots, another for the hover shots. A 3rd publish means something is being fixed blind: stop, read the actual state, then fix.
 
 **Script root, resolved once per session:** `WF="$HOME/docs/memory/webflow"` — every verification command is `node "$WF/scripts/<name>.js" …`, so it runs from any working directory (v1.9.0). Deps are pinned in `$WF/package.json` → `npm install` there; never `npm i --no-save`, which prunes the others.
 
-**Published shots:** `node "$WF/scripts/shot-el.js" <url> <out.png> <W> "<cssSelector>" <mobile:1|0> <port>` (unique port per run).
+### ONE CALL FOR THE WHOLE EVIDENCE SET (v1.10.0 — use this, not the individual scripts)
+
+```
+node "$WF/scripts/verify-section.js" <published-url> "<builtSel>" <outDir> \
+     --section=<name> --widths=1440,991,767,390 --ref=<reference-shot-dir> --audit [--states=base,auto,scroll:40]
+```
+
+Every breakpoint shot (one browser launch, reload per width), every pixel-diff against its reference frame, the a11y/perf audit at desktop + phone, and the interaction states — **one tool call, one consolidated `EVIDENCE verify-section` block, one JSON.** Same scripts, same strict thresholds, same fail-closed verdicts underneath; nothing about accuracy changes.
+
+**Why this is mandatory, not a convenience:** in a conversation every tool result is re-sent with every later call, so **call count is what compounds token cost, not output size**. The 12-call version of this pass cost multiples of the 1-call version for identical evidence. Reach for the individual scripts (`shot-el`, `pixel-diff`, `page-audit`, `state-shot`) only for a single targeted re-check inside a fix pass — never to assemble a full pass by hand.
+
+Verdict handling: `PASS` = every width scored, height within tolerance, no hot region, audit clean, no blank capture, no overflow. `UNSCORED` on a width means **no reference frame existed** — that is not a pass; say so in the report and name the derived values. `FAIL` names the width, the reason and the exact hot-region boxes to fix.
+
+**Individual scripts (fix passes + special cases):** `shot-el.js <url> <out.png> <W> "<sel>" <mobile:1|0> <port>` (unique port per run).
 
 **Interaction states:** `node "$WF/scripts/state-shot.js" <url> <outPrefix> <W> "<sel>" "base,auto,scroll:40,click:.tab" <mobile> <port>` — resting + hover + focus + click + scrolled shots in one browser launch, on a published URL or a `file://` reference. Required for §1.8; `pixel-diff.js` scores each matched pair. `auto` hovers up to 6 interactive descendants; **`auto:N` raises the cap, and everything past it returns as `unverifiedStates` + a stderr WARN. An unhovered interactive element is an UNVERIFIED state, never an absent one** — raise the cap, name it with `hover:<sel>`, or list it as unverified in the report. Ignoring the warning silently = failed gate.
 - **Clip to element's bounding box, NOT `{x:0,y:0}`** — CDP clip is PAGE-origin; fixed `y:0` captures blank page top. ~5-6KB PNG = blank capture → wrong clip or unpublished/opacity-hidden page.
@@ -149,7 +162,7 @@ Budgets are overridable per project — `--budget imageKB=200,domDepth=28` — a
 
 Read back only what can actually be wrong. Three sets, nothing else:
 
-1. **Every property in the intake spec** for that class — you set it, so you verify it. This is the whole diff for most classes.
+1. **Every property in the intake spec FILE** (`$WF/sites/<site-id>/specs/<section>.md`) for that class — you set it, so you verify it. Diff against the written contract, never a recollection of it (v1.10.0). This is the whole diff for most classes.
 2. **Inheritance-risk set** (silently wrong even when never set): `color`, `font-family`, `font-weight`, `line-height` — check the class, then the parent chain.
 3. **Webflow-trap set** (the properties this platform loses): `grid-column-gap` + `grid-row-gap` (both longhands, flex included) · all 4 `border-radius` corners · width strategy (`width` vs `width:100%`+`max-width`) · `padding-*`/`margin-*` sides that a shorthand would have swallowed · `box-shadow` layer count · `background-image` gradient stops+angle · `transition-*` longhand triple where a hover exists · `position`+offsets on anything absolute/sticky.
 
@@ -172,7 +185,20 @@ Any one of the three failing = FAIL → read the named regions → fix pass. Sco
 
 **EVIDENCE RULE — the score is the tool's output, never your sentence.** The `EVIDENCE pixel-diff` block is pasted verbatim into the report (§5). A report carrying a number without the block is not a passed gate, it is an unverified claim; the same applies to `page-audit`, `state-shot` and `motion-verify` output. Regression suite for the gate itself: `node "$WF/scripts/pixel-diff.test.js"` (5 cases, must stay green after any change to the differ).
 
-**Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good." Visual catches what property diff misses: per-char styling, font rendering, color profile, image quality, balance, shadow softness, gradient smoothness.
+**IMAGE DISCIPLINE — measurement replaces eyeballing ONLY where it is strictly stronger (v1.10.0).** Opening a PNG costs ~1-2k tokens *and stays in context for the rest of the session*, so an unnecessary image view is paid for again on every later call. The rule is not "look less", it is **look where looking adds information**:
+
+| Situation | Do |
+|---|---|
+| Reference render, before building | **ALWAYS open it** — Rule 1, non-negotiable. Per-char gradients, layered shadows, blurs, overlaps and true wrap points are invisible in values and this is the only place they are caught |
+| A width scored **PASS** (≥97% + height ≤2% + no hot region) | **Do not open the shots.** The measurement is stricter than your eye: it compared every pixel, checked height, and checked per-region concentration. Re-viewing a PASS adds no information and costs context |
+| A width scored **FAIL** | **Open the built shot and the diff PNG** for the named hot regions. That is what the coordinates are for |
+| A width scored **UNSCORED** (no reference frame) | **Open the built shot** — there is no measurement, so your eye is the only gate. Report it as visually-checked-only |
+| Anchor pass, once per section, at the primary width | **Open the built shot side by side with the reference once**, even on PASS. Holistic wrongness that is spatially identical to the reference (right pixels, wrong feel — balance, hierarchy, an image that is technically placed but visually wrong) is the one class the differ cannot see |
+| Behaviour states, a11y, content, icons, effects | **Text.** `state-shot`/`motion-verify`/`page-audit` emit measured verdicts; open a state PNG only when its pair scores FAIL |
+
+So: **one reference view + one anchor comparison + images only on failures.** That is 2-4 image views per section instead of 10-20, with a stronger evidence chain than before — because every unopened image was replaced by a measurement, never by an assumption. Never skip an image because of budget when the row above says open it; never open one "to be sure" when it scored PASS.
+
+**Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good."
 
 ## 4. Fix pass (batched, convergent)
 

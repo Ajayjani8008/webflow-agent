@@ -48,6 +48,31 @@ Inline `set_text` honored ONLY on `Heading`, `Paragraph`, `Button`, `TextLink`, 
 - **Single-field form:** keep FormForm + first input, restyle, remove extra labels/inputs/button. **KEEP Success/Error messages** (display:none until submit) — removing them in the same batch that empties the form can prune the ENTIRE FormWrapper. Must remove → separate later call + re-verify.
 - **`FormTextInput` placeholder UNSETTABLE via MCP** (attribute → "internal error"; settings channel → "reserved"; no settings key). Native workaround: absolute `Paragraph` overlay (pointer-events:none, nowrap/ellipsis) over transparent borderless real input (bg transparent, border-*-width 0, box-shadow none, height auto). Input stays focusable underneath. `name`/`domId`/`required`/`type` DO set via `set_settings`. Log placeholder limit to impossible_cases.md.
 
+## Auto-skeleton modules — the efficient flow (v1.10.0)
+
+`Slider`, `Tabs`, `Navbar`, `Dropdown` and `Form` all **auto-generate a child skeleton** on creation. Discovering that skeleton one call at a time is what makes these the most expensive sections in the pack (a slider built call-by-call has cost ~197k tokens in practice — the calls compound, not the payloads). The flow below gets identical structure with a fraction of the calls; it removes round-trips, never checks.
+
+**The pattern, for all five:**
+1. **Create the module bare** — never pass `children` (a lone `FormTextInput`/`Slide` errors and rolls back).
+2. **ONE subtree read** — `data_element_tool > get_all_elements` scoped to the module id, `children_depth` 3-4. That single result is your map of every generated node id. **Never re-read it**; keep the ids and work from them. Re-reading the subtree between edits is the single biggest waste in these builds.
+3. **ONE style batch** for every class the module needs (wrapper, slides, mask, arrows, nav dots, tab links, panes) — `data_style_tool` takes them together.
+4. **ONE settings batch** — `data_element_settings_tool > set_settings` with `operations[]` for every generated child at once (tags, dom ids, visibility, slider/tabs options).
+5. **ONE `data_element_builder` call** for the content you add inside the generated children (slide contents, tab pane contents) — build all slides in that one call, not slide by slide.
+6. **ONE post-batch count check** (direct children only) — the builder can silently duplicate a subtree; catch it here, `remove_element` immediately.
+7. Verify with the single `verify-section.js` call (pixel-verify §0).
+
+Known per-module facts (these are why the skeleton must be read, not assumed):
+
+| Module | Auto-generates | Watch |
+|---|---|---|
+| `Slider` | `SliderMask > Slide ×2` + left/right `SliderArrow` + `SliderNav` | default is 2 slides — **add the rest in ONE builder call**; arrows/nav are real elements needing classes; autoplay/loop/easing are Designer settings → `[critical]` ledger, and the slider is a dead shell until re-init there (status `partial`, never "working") |
+| `Tabs` | `TabsMenu > TabLink ×2` + `TabsContent > TabPane ×2` | link↔pane pairing is positional; add pairs in one call; the active-state class is set on the link, not the pane |
+| `Navbar` | `Container > Brand + NavMenu > NavLink ×3` + `MenuButton` | native mobile collapse is built in — never rebuild it; breakpoint for collapse is a Designer setting |
+| `Dropdown` | `DropdownToggle` + `DropdownList` | this IS the accordion/FAQ answer (never `<details>`, never height-animation JS); open/close is Designer interaction work |
+| `Form` | `FormWrapper > FormForm > [labels, inputs, submit]` + Success/Error siblings | **keep** Success/Error (removing them in the same batch can prune the whole FormWrapper); `placeholder` is unsettable via MCP (see § Native form gotchas) |
+
+Every one of these carries Designer-only initialization → this site's `pending_designer_work.md` as `[critical]`, and the section reports `partial` until it is confirmed applied.
+
 ## MCP protocol handling — ONE path, works on old and new servers
 
 **Never branch on protocol version. Never ask which spec a server speaks. Never build a dual path.** The MCP spec moved `2025-11-25` → `2026-07-28`, adoption is staggered (SDKs ship over ~10 weeks), and the Webflow server may speak either — so every rule below is written to be *already true on both* and needs no detection. (Separate number: the **Webflow MCP server** is `2.0.1`, verified 2026-07-28 via `webflow_guide_tool` — server version ≠ protocol version; tool/action names below are the server's and the spec bump does not touch them.)

@@ -5,7 +5,7 @@ description: Intake from an HTML/CSS/JS delivery used as the build source (files
 
 # HTML Intake — the delivery is a behaviour contract
 
-Split out of design-intake in v1.8.0 (source isolation: a Figma build must not pay for these tables, and vice versa). Everything else in the pipeline is unchanged — this produces the same spec format as design-intake § Output, and pixel-verify / responsive-pass don't care where the spec came from.
+Split out of design-intake in v1.8.0 (source isolation: a Figma build must not pay for these tables, and vice versa). Everything else in the pipeline is unchanged — this produces the same spec format as design-intake § Output — and like it, the spec is WRITTEN to `$WF/sites/<site-id>/specs/<section>.md` (v1.10.0), never left in conversation only, and pixel-verify / responsive-pass don't care where the spec came from.
 
 **Still applies from `design-intake`, don't duplicate it here:** § R render-first study · § D assets · § E validation checkpoint · § CF content fidelity · § Output spec format. Load design-intake for those sections only if the build needs them spelled out; the rules below assume them.
 

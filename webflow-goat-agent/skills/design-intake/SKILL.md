@@ -91,7 +91,11 @@ Export every SVG/image from Figma (or user files). Never redraw an existing SVG;
 5. **Impossible scan:** rotation, blend beyond multiply/screen/overlay, scroll-snap, 3D → impossible_cases.md + alternative
 6. **Description-source completeness:** structure, palette, typography, layout, copy, image descriptions — missing critical → ask
 
-## Output — working spec (per section, in-context note, not saved doc)
+## Output — working spec, WRITTEN TO DISK (v1.10.0)
+
+**Save it: `$WF/sites/<site-id>/specs/<section>.md`.** It used to be an in-context note, which cost accuracy and money at once: the diff target lived only in conversation memory, so a crash lost it, a long session let it drift, and the pipeline could never be split across sessions. On disk it is the *contract* — pixel-verify §2 diffs against the file, not a recollection, and a fresh session can build or verify a section with no history at all.
+
+Write it once at the end of intake, then update the `effects:` row statuses in place as they resolve. Anything the build discovers that the spec did not capture (a hidden state, a second image, a wrap point) is appended to the file in the same pass it is found — a spec that no longer matches what shipped is a broken contract, not a stale note.
 
 ```
 SECTION: [name]              source: figma node X | screenshot | html

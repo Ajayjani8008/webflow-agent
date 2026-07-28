@@ -32,10 +32,14 @@ for f in "$MEM"/scripts/*.js "$MEM"/scripts/*.sh; do
   [[ -e "$f" ]] || continue
   PAIRS+=("$f:$REPO/scripts/$(basename "$f")")
 done
-# the per-site template always travels with the pack
+# the per-site template always travels with the pack (files at the top level, plus specs/)
 for f in "$MEM"/sites/_template/*; do
-  [[ -e "$f" ]] || continue
+  [[ -f "$f" ]] || continue
   PAIRS+=("$f:$REPO/docs-memory/sites/_template/$(basename "$f")")
+done
+for f in "$MEM"/sites/_template/specs/*; do
+  [[ -f "$f" ]] || continue
+  PAIRS+=("$f:$REPO/docs-memory/sites/_template/specs/$(basename "$f")")
 done
 # real sites: sync the three state files IF the repo already tracks that site, so outstanding
 # Designer work and the class registry survive a restore. Caches (figma-cache/ref-cache) never

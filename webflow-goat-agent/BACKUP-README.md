@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.9.1
+# Webflow GOAT Agent — Backup v1.10.0
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -20,6 +20,22 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.10.0 changes (since v1.9.1) — token cost fixed at the root, accuracy held constant
+
+One slider section had cost ~197k tokens. Measured root cause: **not** instruction size (a full slider T1 load is ~33k, once) and **not** payload size. It is that in a conversation **every tool result is re-sent with every later call, so N tool calls cost roughly N²/2 in context** — a 60-call section pays for its early results sixty times. Batching *writes*, which is all the old "token discipline" did, touched none of that.
+
+Every fix below is accuracy-neutral or accuracy-positive. No gate was loosened, no threshold moved, nothing became optional.
+
+- **ONE verification call instead of ~12.** New `verify-section.js` captures every breakpoint in a single browser launch, scores each against its reference with the same strict gate, runs the a11y/perf audit at desktop + phone, captures interaction states, and prints one consolidated `EVIDENCE` block. Proven on a live page: 3 widths + 2 audits in 35s, one call. It correctly FAILED a width scoring **97.42% global** on region concentration — the strict gate reaching all the way through the driver.
+- **One section per session**, made possible by writing the intake spec to `sites/<site-id>/specs/<section>.md`. This is also an accuracy gain: the diff target is a written contract instead of conversation memory, it survives a crash, and it cannot drift in a long session. `session-recovery` now treats a cold start as the normal case.
+- **Image discipline.** An opened PNG costs ~1-2k tokens *and is re-sent for the rest of the session*. Rule: always open the reference render (Rule 1 — per-char gradients and layered shadows are invisible in values), one anchor comparison per section, then **only** shots that scored FAIL or UNSCORED. A width that scored PASS was compared pixel-by-pixel, height-checked and region-checked — stricter than an eye, so re-viewing it adds nothing. 2-4 image views per section instead of 10-20, with a stronger evidence chain.
+- **Read narrow.** Never `get_all_elements` depth `-1` on a page, never `get_metadata` on a page root. Query the touched subtree at the smallest depth that answers the question; a text read-back for values, a snapshot only to *see*.
+- **Auto-skeleton module recipe** (`webflow-platform`) for the modules that caused the blow-up: Slider, Tabs, Navbar, Dropdown, Form all auto-generate children, and discovering them one call at a time is the expense. Now: create bare → **ONE** scoped subtree read → **ONE** style batch → **ONE** settings batch with `operations[]` → **ONE** builder call for all slides/panes → one count check. **Never re-read the subtree between edits** — that was the single biggest waste.
+- **Cost checkpoint:** report at ~60k on a section, stop and ask at ~100k. Explicitly a report, never permission to abandon a section or lower a gate — if a section needs more, it gets more, visibly.
+- Corrected a misleading claim: `element_snapshot_tool` is free of *publishing*, not free of tokens.
+
+Target: **197k → ~50-70k for a slider**, with the v1.9.0 strict gates fully intact.
 
 ## v1.9.1 changes (since v1.9.0) — post-release review fixes
 

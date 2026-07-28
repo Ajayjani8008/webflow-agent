@@ -31,4 +31,4 @@ Everything lands in `$WF/sites/<site-id>/ref-cache/{domain}/` (`WF="$HOME/docs/m
 ## Validation + spec (same contract as design-intake)
 
 - Fonts exist in Webflow (`data_fonts_tool`) or user installs; colors valid; spacing numeric; impossible cases → impossible_cases.md.
-- Spec output = design-intake § Output, `source: url {domain}/{selector}`. Downstream flow unchanged — pixel-verify + responsive-pass don't know the source was a live site.
+- Spec output = design-intake § Output, `source: url {domain}/{selector}`, WRITTEN to `$WF/sites/<site-id>/specs/<section>.md` (v1.10.0) — never left in conversation only. Downstream flow unchanged — pixel-verify + responsive-pass don't know the source was a live site.
