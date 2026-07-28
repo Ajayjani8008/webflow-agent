@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "site": { "id": "", "name": "", "site_id": "" },
+  "page": { "name": "", "page_id": "", "branch": "" },
+  "portable": false,
+  "portable_switched_at": null,
+  "sections": [],
+  "tasks": [],
+  "snapshots": [],
+  "recovery_point": null,
+  "updated_at": null,
+  "_schema": {
+    "sections[]": {
+      "name": "hero",
+      "status": "planned | in-progress | built | verified | responsive | blocked",
+      "node_ids": ["root element id", "…"],
+      "pixel_score": 0,
+      "breakpoints": { "medium": 0, "small": 0, "tiny": 0 },
+      "verification_report": "pasted PIXEL-VERIFY block or path",
+      "responsive_report": "pasted RESPONSIVE block or path",
+      "a11y_perf": { "verdict": "PASS|FAIL", "report": "page-audit output or path" },
+      "publishes": 0,
+      "updated": "YYYY-MM-DD HH:MM"
+    },
+    "tasks[]": { "id": "server task id", "kind": "publish | asset-upload | other", "created": "ISO", "state": "open|done" },
+    "snapshots[]": { "target": "element id or section", "reason": "pre-rebuild | pre-delete | pre-unregister", "snapshot": "path or inline id list", "at": "ISO" },
+    "recovery_point": "section name to resume from, or null"
+  }
+}
