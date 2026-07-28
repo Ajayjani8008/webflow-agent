@@ -44,14 +44,14 @@ MCP builder can't create a listed module (missing type/422)? → build it in led
 
 ## EFFECT FIDELITY LADDER — every visual effect gets a tier, none gets dropped
 
-Source has an effect (hover, pseudo-element, keyframe, canvas, shape, filter, transition) → find its row, build at the LOWEST tier that reproduces it exactly. "Webflow has no control for it" is never a reason to simplify or omit — it is a reason to move one tier down. Every effect from the source lands in the intake `effects:` manifest with its tier, and pixel-verify FAILS on any manifest row with no tier/status (agent Rule 12).
+Source has an effect (hover, pseudo-element, keyframe, canvas, shape, filter, transition) → find its row, build at the LOWEST tier that reproduces it exactly. **Descent is strictly ordered and each step must be attempted before the next is considered: T1 → T2 → T3 → (ask permission) → T4.** Starting at a lower tier because the source used code, because it looks faster, or because the reference's markup was already written that way = ban violation. "Webflow has no control for it" is never a reason to simplify or omit — it is a reason to move ONE tier down, with the reason written out. Every effect from the source lands in the intake `effects:` manifest with its tier, and pixel-verify FAILS on any manifest row with no tier/status (agent Rule 12).
 
 | Tier | Path | Covers |
 |---|---|---|
 | **T1 native control** | `data_style_tool` on class (incl. `pseudo: "hover"/"focus"/"active"`) | color/bg/gradient, spacing, radius, border, box-shadow, opacity, `filter`, `backdrop-filter`, `transform: translate/scale`, `transition-*`, `mix-blend-mode`, `overflow`, `object-fit`, `aspect-ratio`, `position`+offsets, `z-index` |
 | **T2 native structure** | real child element + class (visually identical, Designer-editable) | `::before`/`::after`, custom shapes, decorative overlays/glows, gradient borders, badge dots, underline swipes, masks |
 | **T3 native motion** | **Native Interactions panel — GSAP-powered, no code** (timeline, ScrollTrigger, SplitText, staggers). Designer-only: verified NO API surface (`designer_tool` has zero interaction actions; Webflow's tool registry returns "full tool list" for INTERACTIONS) → `[critical]` ledger build-script · OR native `Lottie` element. Route via `motion-build`. **Never inject GSAP/tween code — the engine is already in the platform** | `@keyframes`/`animation`, scroll-reveal, scroll-scrub/parallax, pinning, page-load, click-toggle, marquee, infinite loops, staggered groups, split-text, SVG morph, vector motion |
-| **T4 contained code** | last resort, standing-authorization set only (below) | `<canvas>` + JS animation, WebGL, physics/particle simulation, `clip-path` when T1 read-back fails AND no SVG path works. **NOT** scroll-scrub, split-text, mouse-move, staggers or timelines — those are native Interactions-panel features (T3) |
+| **T4 contained code** | last resort — eligible set below AND a per-effect user yes (descent proof first; no yes → native fallback) | `<canvas>` + JS animation, WebGL, physics/particle simulation, `clip-path` when T1 read-back fails AND no SVG path works. **NOT** scroll-scrub, split-text, mouse-move, staggers or timelines — those are native Interactions-panel features (T3) |
 
 ### T2 recipes (the pseudo-element + shape answers)
 
@@ -76,13 +76,22 @@ No panel equivalent at all (WebGL, physics simulation, canvas particle systems) 
 
 ### T4 — contained code (canvas & JS-driven only)
 
-**Standing authorization:** the user's standing instruction "preserve Canvas animations and every HTML effect, do not simplify" authorizes T4 *for the effects in this table only*. Everything else stays banned forever, `/custom-code-once` unchanged for anything outside it.
+**Eligibility ≠ authorization.** The canvas/WebGL set below is the ONLY code-eligible category — but eligibility just earns the right to *ask*. Before writing a single line:
+
+1. **Write the descent proof** for that specific effect: `T1: [tried what / why it can't] · T2: [recipe checked / why not] · T3: [panel feature checked, get_more_tools asked / why not]`. No proof = no code, full stop.
+2. **Ask the user and wait for an explicit yes** — one line per effect, all of a section's asks batched into ONE message:
+   *"E4 `#particles` canvas (180 dots, link <120px): T1/T2/T3 can't reproduce it because [reason]. Native fallback: [static gradient / Lottie loop / nearest native motion]. Add a contained canvas embed, or ship the native fallback?"*
+   No answer, "up to you", or "do what's best" → **build the native fallback**, note it, move on. Never read silence as consent.
+3. **Log the authorization verbatim:** registry `## Custom-Code-Exceptions` gets the user's actual words + date alongside the snippet entry. pixel-verify's ban sweep FAILS a T4 hit whose registry entry has no recorded permission (§1 whitelist), even when the effect is in the manifest.
+4. Permission is per effect, per session — never a mode, never inherited by the next canvas, the next section, or a later session.
+
+Anything OUTSIDE this set: the USER invokes `/custom-code-once` themselves. The agent never proposes it, never hints that code would be easier, and never self-invokes.
 
 Containment rules (all mandatory):
 1. **Scope:** ONE `html-embed` holding only the effect (e.g. `<canvas>` + its `<script>` in an IIFE), or page-footer code. Never layout, spacing, typography, color, hover, or anything a T1–T3 row covers — that is still an instant ban-sweep FAIL.
 2. **Sizing/layout stays native:** the embed's wrapper div is a normal styled class (width/height/position via style tool). Canvas gets `width:100%; height:100%; display:block` + DPR-aware resize (`devicePixelRatio`, `ResizeObserver`) so it is not fixed-px and not blurry on retina.
 3. **Self-contained:** no CDN/`<script src>`, no libraries, no globals (IIFE), guard `if (!el) return`, `cancelAnimationFrame` on unmount/hidden (`document.hidden`), honor `prefers-reduced-motion` (static first frame).
-4. **Log both, same pass:** `registry.md ## Custom-Code-Exceptions` (`[date] page/section — canvas: what, why T1-T3 impossible, standing-authorization`) + `pending_designer_work.md` `[optional]` review entry.
+4. **Log both, same pass:** `registry.md ## Custom-Code-Exceptions` (`[date] page/section — canvas: what, descent proof (why T1-T3 impossible), user authorization: "<their exact yes>"`) + `pending_designer_work.md` `[optional]` review entry.
 5. **Report it:** the section report names every T4 effect. Silent code = ban violation even when authorized.
 6. **Fidelity:** reproduce the source animation's actual math (particle count, speed, colors, easing, blend) — a "similar" canvas is a simplification and fails Rule 3.
 

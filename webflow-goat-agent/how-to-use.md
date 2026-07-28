@@ -1,4 +1,4 @@
-# Webflow GOAT — How To Use (v1.2.0)
+# Webflow GOAT — How To Use (v1.1.2)
 
 One agent, everything inline. You give a design source + target page, it builds pixel-perfect native Webflow. This doc = the whole manual.
 
@@ -9,7 +9,7 @@ One agent, everything inline. You give a design source + target page, it builds 
 | Figma file | "Build [page] from this Figma: <url>" | One-time `/figma-setup` caches whole file → builds section by section from cache |
 | Live website | "Build home page like this site: <url>" | Exact computed CSS extracted + reference screenshots → same accuracy as Figma |
 | Screenshot | Paste image + "build this" | Vision analysis with confidence levels → confirms unknowns with you first |
-| HTML/CSS code | Paste it + "build this" | Values read as ground truth → rebuilt 100% native (code never enters site) |
+| HTML/CSS code | Paste it (or point at the folder) + "build this" | Whole delivery read (every css/js), reference RUN headless, then rebuilt 100% native — layout AND hover/scroll/load behaviour, code never enters the site |
 | Just an idea | Describe it | Agent drafts spec → you confirm → build |
 
 Open the Webflow Designer on the target page first — agent builds where you're looking.
@@ -18,7 +18,7 @@ Open the Webflow Designer on the target page first — agent builds where you're
 
 | Command | What it does | When |
 |---|---|---|
-| `/figma-setup <url>` | Caches Figma file locally (one time). Scoped by default: only the sections you're building; say "fetch everything" for the whole file | Start of a Figma project |
+| `/figma-setup <url>` | Caches entire Figma file locally (one time) | Start of a Figma project |
 | `/portable on` · `/portable off` | Raw values instead of variables → section survives copy-paste to another site | Before building a section you'll reuse cross-site |
 | `/custom-code-once` | ONE-time exception to the custom-code ban — one snippet, logged, ban restores | Only when you hard-require custom JS/CSS |
 | `/webflow-help` | Shows this cheat sheet | Anytime — costs nothing to a build |
@@ -32,7 +32,7 @@ Read exact values → build native elements + classes → verify against source 
 ## The 6 rules that affect YOU
 
 1. **It never guesses.** Missing value that matters → it asks you once. Answer = faster build.
-2. **Zero custom code.** Sliders/tabs/forms = native elements. Hard-need JS/CSS → `/custom-code-once` is the only door.
+2. **Zero custom code, and never the agent's decision.** Sliders/tabs/forms = native elements. Only a canvas/WebGL effect is even eligible for code, and the agent must show why T1/T2/T3 can't do it and then ASK you — no answer means it ships the native fallback. Anything else: `/custom-code-once` is the only door and only you can open it.
 3. **"Done" = proven.** Every section screenshot-verified vs the design. Don't skip-approve mid-verification.
 4. **Some things are Designer-only** (IX2 animations, slider init, Symbols). They land in `pending_designer_work.md` — check that list; the agent will tell you it's "partial", never falsely "working".
 5. **One source at a time.** Figma build won't touch URL tools and vice versa — that's intentional (token/speed).

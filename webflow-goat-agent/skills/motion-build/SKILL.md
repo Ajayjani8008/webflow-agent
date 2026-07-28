@@ -52,7 +52,7 @@ IR is the single source of truth for build, verify and report.
 | **CSS** | `data_style_tool` `pseudo: hover/focus/active` + `transition-*` longhands | every state change: buttons, cards, links, icons, inputs, nav | ✅ agent, inside the section's existing class batch |
 | **Interactions** | native Interactions panel (GSAP-powered): timeline, ScrollTrigger, SplitText, staggers | scroll reveals, scroll-scrub/parallax, pinning, page-load sequences, click toggles, mouse-move, loops, split-text, multi-step timelines | ❌ human clicks the panel from the agent's build-script; agent verifies |
 | **Lottie** | `.json` asset → native `Lottie` element | vector illustration motion, dash-draw, morphs, icon loops | ✅ agent (probe upload once per site) |
-| **code** | contained embed (build-reference § Ladder T4) | `<canvas>`, WebGL, bespoke rAF only — no native equivalent exists | ✅ authorized set only |
+| **code** | contained embed (build-reference § Ladder T4) | `<canvas>`, WebGL, bespoke rAF only — no native equivalent exists | ⚠️ eligible ≠ allowed: write the T1/T2/T3 why-not proof, **ask the user, get an explicit yes**, log it verbatim. No yes → native fallback |
 
 **There is no "custom GSAP" tier.** Anything that would have gone there is an Interactions-panel build. If a motion seems to need hand-written GSAP, it is a panel feature you have not mapped yet — map it (§ Panel detection) before even considering code, and if it truly has no panel equivalent, log it to `impossible_cases.md` with the closest native motion. Only canvas/WebGL earns the code tier.
 

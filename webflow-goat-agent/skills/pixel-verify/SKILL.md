@@ -49,7 +49,7 @@ MCP: `element_snapshot_tool` / `data_element_tool` get. API: `GET /v2/pages/{id}
 - [ ] Built via `data_element_builder`, not `data_whtml_builder`
 - [ ] No data-* attributes for styling
 
-Any hit = build void regardless of visual match. Delete, rebuild native, restart verify. **Whitelist (exact match only, never "similar"):** ① snippet logged in registry.md `## Custom-Code-Exceptions` via user-invoked `/custom-code-once` ② a **T4 effect from the intake manifest** (canvas/JS-driven only, per build-reference § Effect Fidelity Ladder T4) with its registry log present. A T4 hit that is NOT in the manifest, or carries layout/spacing/typography/color/hover CSS, or has no registry entry → still an instant FAIL.
+Any hit = build void regardless of visual match. Delete, rebuild native, restart verify. **Whitelist (exact match only, never "similar") — every entry needs BOTH a descent proof and a recorded user yes:** ① snippet logged in registry.md `## Custom-Code-Exceptions` via **user-invoked** `/custom-code-once` ② a **T4 effect from the intake manifest** (canvas/WebGL only, per build-reference § Effect Fidelity Ladder T4) whose registry entry carries the `T1/T2/T3 why-not` proof **and the user's verbatim authorization + date**. Instant FAIL: a T4 hit not in the manifest · no registry entry · registry entry without the proof line · registry entry without a recorded permission (agent self-authorized) · permission inherited from another effect, another section or an earlier session · any code carrying layout/spacing/typography/color/hover CSS. "The user said preserve the effects" is context, never permission for a specific snippet.
 
 ## 1.5 CONTENT GATE — zero placeholders (deterministic, run every section)
 
@@ -90,7 +90,8 @@ Walk the intake `effects:` manifest row by row. Every row must resolve to exactl
 | `built` (T1) | style read-back shows the property on the class/pseudo-state, values match |
 | `built` (T2) | the real child element exists with its class + styles; rendered shot shows the effect |
 | `interactions-queued` (T3) | full build-script in pending_designer_work.md marked `[critical]` — trigger, target class/component, all stops, duration, easing, loop, stagger; native Interactions panel (no injected GSAP) |
-| `code-tier` (T4) | embed present + registry `## Custom-Code-Exceptions` entry + it actually animates in the published page |
+| `code-tier` (T4) | descent proof + user's verbatim authorization logged in registry `## Custom-Code-Exceptions` + embed present + it actually animates in the published page. Missing proof or permission → treat as ban hit (§1), not as `built` |
+| `native-fallback` | the user was asked about an eligible T4 case and chose native (or didn't answer) — the fallback that shipped is named in the report |
 | `impossible` | impossible_cases.md entry + the native alternative that shipped, named in the report |
 
 Row with no status, or an effect visible in the reference that never entered the manifest → FAIL (go back to intake, extend the manifest, build it). "Simplified", "close enough", "skipped for now" are not valid statuses.
@@ -155,7 +156,8 @@ Can't close: unsupported property → impossible_cases.md + alternative · API c
 ```
 PIXEL-VERIFY — [section]  diff-depth: LIGHT|FULL  fix passes: N
 NATIVE       ✓ 0 embeds/custom code/style-attrs, native modules used, element_builder only
-             (authorized T4: [none | list + registry logged])
+             code tier: [none] | [E4 canvas — descent proof ✓ · user authorized "<their yes>" [date] · registry logged ✓]
+             asked-and-declined: [effects where the user chose the native fallback | none]
 CONTENT      ✓ 0 placeholders · N/N strings verbatim · N/N images real assets + alt
 ICONS/SVG    ✓ N/N bound by asset id, viewBox, sized, 200 OK, non-zero at all breakpoints
 STRUCTURE    ✓ N/N elements, classes, exact copy, order

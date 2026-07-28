@@ -7,7 +7,11 @@ description: ONE-TIME user-authorized exception to the Webflow custom-code ban. 
 
 The GOAT code ban (Rule 4) stays the default forever. This skill is the narrow, user-controlled exception for anything **outside** the ladder's T4 set. It exists so a hard user requirement doesn't dead-end — not to soften the ban.
 
-**Not this skill's job:** effects that already have a tier on the Effect Fidelity Ladder (build-reference). `::before`/`::after`, shapes/clip-path, `@keyframes`, hover — those are T1/T2/T3 native builds; reaching for code there is a violation, not an exception. Canvas/JS-driven animation is T4 under the user's standing "preserve the HTML effects" instruction — build it per the ladder's containment rules and log it, no invocation needed. Everything else (custom CSS hacks, third-party scripts, JS to fake a native module) still requires the protocol below.
+**Not this skill's job:** effects that already have a tier on the Effect Fidelity Ladder (build-reference). `::before`/`::after`, shapes/clip-path, `@keyframes`, hover — those are T1/T2/T3 native builds; reaching for code there is a violation, not an exception.
+
+**Canvas/WebGL (T4) does NOT come here, and is NOT pre-authorized either:** it stays on the ladder, but the agent must write the `T1/T2/T3 why-not` descent proof, **ask the user for permission for that specific effect, and get an explicit yes** before any code exists (build-reference § Ladder T4). Asking a direct permission question when an eligible canvas case is proved is required; *offering* code as an option, or reading silence/"do what's best" as a yes, is not. No answer → build the native fallback.
+
+Everything else (custom CSS hacks, third-party scripts, JS to fake a native module, "just one line to fix the spacing") requires the user-invoked protocol below.
 
 ## Trigger — user only, never agent
 

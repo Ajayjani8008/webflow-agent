@@ -1,4 +1,4 @@
-# Webflow GOAT Agent — Backup v1.7.0
+# Webflow GOAT Agent — Backup v1.7.1
 
 **Created:** 2026-07-18 (Mac) · **Cross-platform:** Windows / macOS / Linux — zero platform-specific paths anywhere in this pack.
 
@@ -20,6 +20,14 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).
+
+## v1.7.1 changes (since v1.7.0) — native-first is enforced, code needs permission
+
+1. **Code is never the first move and never the agent's decision.** Rule 4 now demands a written descent proof per effect (`T1: tried/why not · T2: recipe checked/why not · T3: panel feature checked + get_more_tools asked/why not`) before any html/css/js exists. No proof line = no code.
+2. **T4 canvas/WebGL: eligible, not pre-authorized.** The old "standing authorization" is gone. The agent writes the proof, then ASKS the user for that specific effect (one batched message per section) and waits for an explicit yes. Silence / "do what's best" = build the native fallback and say so. Permission is per effect, per session — never inherited.
+3. **`/custom-code-once` unchanged and still user-only** for anything outside the canvas set: the agent may state the path exists if asked, but never proposes, hints at, recommends, or self-invokes it, and never frames code as the faster route.
+4. **Verification enforces it:** pixel-verify ban sweep FAILS a code hit with no manifest row, no registry entry, no descent proof, or no recorded verbatim user authorization; the NATIVE report line now prints the proof/permission and any asked-and-declined effects. §1.7 gains a `native-fallback` status; intake gains `awaiting-permission`.
+5. **Source code is a spec, not a build plan** (design-intake §C): the reference's markup is re-mapped to native modules, its CSS to class values, its JS to T1/T2/T3 behaviour. "The reference did it in JS" is a routing instruction, never a licence to copy code.
 
 ## v1.7.0 changes (since v1.6.0) — HTML behaviour parity + MCP 2.0.1 compatibility
 

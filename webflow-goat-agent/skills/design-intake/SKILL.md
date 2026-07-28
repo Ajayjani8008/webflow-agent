@@ -68,6 +68,8 @@ Every assumption tagged: `assuming 24px gap [MEDIUM]` → `unknowns`. **MEDIUM/L
 
 The HTML file is the contract — **behaviour included, not just layout.** Every interactive and visual effect in it must exist in the Webflow build at its ladder tier (build-reference § Effect Fidelity Ladder), never dropped, never "approximated". Layout-only recreation is the #1 failure of HTML→Webflow work and is a FAIL, not a partial.
 
+**The source's code is a SPEC, never the build plan.** Its markup is div soup to be re-mapped onto native modules; its CSS is values to land on classes; its JS is behaviour to re-express at T1/T2/T3. Build order per row is always native-module map → T1 class styles → T2 real child → T3 native Interactions panel → and only for a proved canvas/WebGL case, **ask the user** and build T4 on an explicit yes (build-reference § Ladder T4). "The reference did it in JS/CSS" is the reason to *route* it natively, never a licence to copy the code.
+
 **C.0 MANDATORY FULL REVIEW — read everything before building anything (never skip, never sample)**
 
 Reading "the HTML" means the whole delivery, not the markup file:
@@ -145,7 +147,7 @@ effects:
   E8 cursor .cursor-dot        follows pointer, lerp .15, scales ×2 over links        T3  → mouse-move interaction
 ```
 
-Every row ends the build as `built` / `interactions-queued` / `code-tier` / `impossible+alternative` — pixel-verify fails on any row without a status (agent Rule 12). Never merge two effects into one row; never leave an effect off the list because it looks minor.
+Every row ends the build as `built` / `interactions-queued` / `code-tier` / `impossible+alternative` — pixel-verify fails on any row without a status (agent Rule 12). A `code-tier` row is only legal once it carries **`T1/T2/T3 why-not` proof + the user's verbatim yes + date**; until then it stays `awaiting-permission`, and if the user doesn't authorize it the row ships as `native-fallback: [what shipped]` (never `simplified`). Never merge two effects into one row; never leave an effect off the list because it looks minor.
 
 **C.4 Canvas capture detail** (needed to rebuild faithfully, not approximate): particle/element count, size range, speed + direction, spawn/respawn rule, colors + opacity, link/line rules + distance threshold, blend mode, background, interaction (mouse repel/attract, click spawn), fps target, DPR handling, resize behavior. Missing detail → read the JS, don't invent.
 
