@@ -17,7 +17,16 @@ const os = require('os');
 const HOME = os.homedir();
 const PACK = path.join(HOME, '.claude');
 const MEM = path.join(HOME, 'docs/memory/webflow');
-const REPO = path.join(HOME, 'Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent');
+// Repo location varies per machine — set WF_REPO to the pack root (the dir holding
+// agents/ rules/ skills/), else the known clone paths are probed in order.
+const REPO = (() => {
+  if (process.env.WF_REPO) return process.env.WF_REPO;
+  const candidates = [
+    'My_Projects/My_Agents/webflow-agent-main/webflow-agent/webflow-goat-agent',
+    'Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent',
+  ].map((p) => path.join(HOME, p));
+  return candidates.find((p) => fs.existsSync(p)) || candidates[0];
+})();
 const AGENT = path.join(PACK, 'agents/webflow/webflow-goat.md');
 const RULES = path.join(PACK, 'rules/webflow/core.md');
 const SKILLS_DIR = path.join(PACK, 'skills');

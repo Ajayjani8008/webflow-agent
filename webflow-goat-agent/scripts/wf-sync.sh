@@ -11,7 +11,15 @@ set -euo pipefail
 
 LIVE="$HOME/.claude"
 MEM="$HOME/docs/memory/webflow"
-REPO="$HOME/Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent"
+# Repo location varies per machine — export WF_REPO to override, else probe known clones.
+REPO="${WF_REPO:-}"
+if [[ -z "$REPO" ]]; then
+  for c in "$HOME/My_Projects/My_Agents/webflow-agent-main/webflow-agent/webflow-goat-agent" \
+           "$HOME/Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent"; do
+    [[ -d "$c" ]] && REPO="$c" && break
+  done
+  REPO="${REPO:-$HOME/My_Projects/My_Agents/webflow-agent-main/webflow-agent/webflow-goat-agent}"
+fi
 APPLY=0; [[ "${1:-}" == "--apply" ]] && APPLY=1
 
 SKILLS=(build-reference cms-build component-build custom-code-once design-intake figma-setup

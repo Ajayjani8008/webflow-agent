@@ -1,0 +1,10 @@
+# This pack is restored by copying files into ~/.claude and ~/docs/memory/webflow,
+# and wf-lint.js compares live↔repo BYTE-for-byte. A CRLF checkout on Windows therefore
+# reports 17 false repo-drift errors. Force LF in the working tree on every platform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text eol=lf
