@@ -20,6 +20,27 @@ Cross-check: every feature visible in the render must exist in the extracted spe
 
 **Native-module map check (same moment):** identify each UI pattern in the render → its native Webflow module (slider/carousel → Slider · tabs → Tabs · accordion/menu → Dropdown · gallery/zoom → Lightbox · video → Video/YouTube · vector anim → Lottie · quote → Blockquote · list → List · nav → Navbar · form → Form). Record in spec `elements:`. Div-imitation of an available native module = banned (agent rule NATIVE MODULE FIRST).
 
+## A.0 COMPILE, DO NOT TRANSCRIBE (v1.11.0 — do this before writing any spec by hand)
+
+Figma source, cached node in hand:
+
+```
+node "$WF/scripts/figma-parse.js"   03-nodes/<node>.dc.jsx    --out=03-nodes/<node>.parsed.json
+node "$WF/scripts/figma-compile.js" 03-nodes/<node>.parsed.json --prefix=<block> --section-tag      --out-plan=03-nodes/<node>.plan.json --out-contract=specs/<section>.contract.json
+node "$WF/scripts/wf-preflight.js"  03-nodes/<node>.plan.json
+```
+
+That produces, from ONE source and therefore consistent by construction:
+- **classes** with every shorthand already expanded to longhand (`gap`→`grid-row-gap`+`grid-column-gap`, `rounded`→4 corners, `p`→4 sides) — the leak that silently voids values in the Custom Properties panel
+- **the element tree** with Figma's positioning model PRESERVED. An absolute child stays absolute. Reinterpreting absolute children as a flex column is what moved a brand block 66px off, and a column anchored by `left` centres on its widest child, not the design's axis
+- **the property contract** for `dom-contract.js` — free, and derived from the same numbers as the build, so the gate can never drift from the plan
+- **the asset list** to upload
+- **a DECISIONS list** — Figma fill idioms (`width:min-content`), rotations that must be baked into the asset, and native-module hints from layer names. These are the only things left for judgment. Resolve them explicitly; never guess one.
+
+Hand-writing the spec is now the FALLBACK (screenshot sources, and HTML/URL which have their own skills). Where a compiler run is possible, a hand-typed value is a defect waiting to happen — every accuracy bug worth naming in the 2026-07-31 session came from that path, not from the build tools.
+
+Element-type choices the compiler makes for you, each for a measured reason: text nodes become **Paragraph/Heading, never TextBlock** (`set_text` is silently ignored on TextBlock, which is created as a plain `Block`); layers whose names look like a native module raise a hint rather than quietly becoming a div, because div-imitating an available module is a ban-sweep failure.
+
 ## F. Figma cache (FAST PATH — check first)
 
 Read `$WF/sites/<site-id>/figma-cache/00-manifest.json` (`WF="$HOME/docs/memory/webflow"`; per site since v1.9.0). `status: "partial"` → the manifest lists what is actually cached: anything not in `nodes[]` is a MISS, fetch it live and update the manifest in the same pass. `status: "cached"` → use cache, ZERO Figma calls. Missing/empty → live path (§A).

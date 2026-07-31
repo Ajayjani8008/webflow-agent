@@ -41,7 +41,16 @@ Figma REST: 60 req/min. Track count in fetch_state. Every 50 requests → pause 
 ## Fetch steps
 
 1. **Structure + variables (always):** `get_metadata` → `01-structure.json` · `get_variable_defs` → `02-variables.json`.
-2. **Nodes (scoped/chunked):** per section `get_design_context` → `03-nodes/{section}.json`. Update fetch_state per chunk. Between chunks: 5s pause; context low → report progress, offer continue later.
+2. **Nodes (scoped/chunked):** per section `get_design_context` → save the response VERBATIM as
+   `03-nodes/{node}.dc.jsx`, then immediately
+   `node "$WF/scripts/figma-parse.js" 03-nodes/{node}.dc.jsx --out=03-nodes/{node}.parsed.json`.
+   **Never write a prose summary of a node.** The cache used to hold sentences like
+   `"709:2703 div.hero-grad — full-bleed radial gradient layer"`, which forced every value to travel
+   Figma → a human reading → a hand-typed call. That path produced a 66px mis-centred block, a
+   letter-spacing that contradicted the render, and hand-written contracts that do not scale.
+   The raw `.dc.jsx` + `.parsed.json` pair is the cache now: machine-readable, re-parseable, and the
+   single source every later artefact is GENERATED from. Update fetch_state per chunk. Between chunks:
+   5s pause; context low → report progress, offer continue later.
 3. **Screenshots:** `get_screenshot` → `04-screenshots/{section}.png` (same rate handling).
 4. **Assets:** download → `05-assets/`.
 5. **Small extras (1-2 calls):** interactions → `09-interactions.json` · comments → `10-comments.json` · references → `11-references.json`.
@@ -75,7 +84,7 @@ Before building section X: manifest status `cached` → build · `fetching` → 
 
 ## Conditional cache reads (during builds)
 
-Per section: always `03-nodes/{section}.json` + `07-tokens.json` + `04-screenshots/{section}.png` + `05-assets/`. `has_animations` → +09 · `has_comments` → +10 · `references_count>0` → +11. Simple section = 4 reads.
+Per section: always `03-nodes/{node}.parsed.json` (+ the `.dc.jsx` beside it if you need to re-parse) + `07-tokens.json` + `05-assets/`. **The screenshot is NOT a routine read** — run `ref-digest.js` on it instead (an opened PNG costs 5k-66k tokens; the digest costs a few hundred and answers Rule 1). `has_animations` → +09 · `has_comments` → +10 · `references_count>0` → +11. Simple section = 4 reads.
 
 ## Invalidation
 
