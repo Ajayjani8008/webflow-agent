@@ -38,7 +38,10 @@ PAIRS=(
   "$MEM/package.json$TAB$REPO/scripts/package.json"
 )
 for s in "${SKILLS[@]}"; do PAIRS+=("$LIVE/skills/$s/SKILL.md$TAB$REPO/skills/$s/SKILL.md"); done
-for f in "$MEM"/scripts/*.js "$MEM"/scripts/*.sh; do
+# scripts/*.json carries DATA the scripts depend on (skeletons.json) — it must travel with the pack.
+# Machine-local state (dotfiles such as .wf-lint-baseline.json) is skipped by the basename guard below.
+for f in "$MEM"/scripts/*.js "$MEM"/scripts/*.sh "$MEM"/scripts/*.json; do
+  [[ "$(basename "$f")" == .* ]] && continue
   [[ -e "$f" ]] || continue
   PAIRS+=("$f$TAB$REPO/scripts/$(basename "$f")")
 done

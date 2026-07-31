@@ -192,3 +192,47 @@ Copies with DOM: structure, text, static image URLs, class styles incl. `:hover`
 | Tool returns `InputRequiredResult` | not an error — re-call the same tool with `inputResponses` + the echoed state. Decision reserved for the user (code, destructive, publish) → surface verbatim, wait, then retry |
 | Read-back matches the PRE-edit state | suspect a cached result before suspecting the write — re-issue with a different query shape; still stale after the write echoed success → treat as a real failure and rebuild that element |
 | `-32002` / `-32602` on an id that existed | same fix either code: re-fetch the id list, then re-read the tool schema |
+
+## Auto-skeleton modules — PROBED, not remembered (v1.11.0)
+
+`scripts/skeletons.json` is the machine-readable map of what `data_element_builder` **actually** creates,
+captured by building one of every module on a throwaway draft page and doing ONE depth -1 read. Run
+`node "$WF/scripts/wf-preflight.js" <plan.json>` before the first build call of a section: it validates a
+planned tree + class list against every trap below and exits 1 with the fix. Zero tokens, zero MCP calls.
+
+**The requested type is not the created type.** `Slider`->SliderWrapper · `Tabs`->TabsWrapper ·
+`Form`->FormWrapper · `Lightbox`->LightboxWrapper · `CMSCollection`->**DynamoWrapper** ·
+`Dropdown`->DropdownWrapper · **`TextBlock`->plain `Block`** · `Blockquote`/`YouTubeVideo`/`RichText` as named.
+`Navbar` is not in the enum at all.
+
+**`set_text` only sticks on types that own their text node.** Verified: `Blockquote` accepts it,
+`TextBlock` **silently ignores it** (passing "PROBE textblock" still produced "This is some text inside of
+a div block."). Safe: Paragraph, Heading, Blockquote, Button, TextLink, LinkBlock. The inner `Block` inside
+a DropdownToggle and inside a TabsLink rejects it too — remove that Block and append a Paragraph.
+
+**Every skeleton ships placeholder COPY, not just structure** (Rule 14 landmine):
+Tabs "Tab 1/2/3" · Dropdown "Dropdown"+"Link 1/2/3" · CMS "No items found." · Form "Name",
+"Email Address", the success AND error strings, form name "Email Form", ids `name`/`email` ·
+**RichText is the worst: a full lorem-ipsum document, H1-H6, lists, and a hardcoded
+`university.webflow.com` link.** Strip or replace in the same pass, then grep the published HTML.
+
+**Default counts do not grow on their own:** Slider 2 slides · Tabs 3 · Dropdown 3 links · CMS 1 item ·
+Form 2 fields. A design with more needs the extra children appended explicitly.
+
+**Icon-font children cannot take an asset.** SliderArrow and DropdownToggle generate Webflow `Icon`
+elements. To use the design's own art, hide the Icon with a `display:none` class and append an `Image`.
+
+**Child ids are DERIVABLE — skip the discovery read.** A module's generated children carry sequential hex
+increments of the parent id (Slider `...ff346` -> mask `ff347` -> slide `ff348` -> slide `ff349` -> arrow
+`ff34a` -> icon `ff34b` -> ... in the depth-first order listed in skeletons.json). Predict the ids for the
+write batch instead of spending a read per module, then let the mandatory post-batch read PROVE them.
+Never report done on predicted ids alone.
+
+**Batch failure has two modes — do not confuse them.** An invalid child placement (e.g. `FormSelect`
+outside a `Form`) returns `MPS rejected update: ... can only be placed in a Form` and **rolls the entire
+batch back to zero children**. A missing style returns `partial_success` and the elements ARE created.
+`MPS rejected update` is overloaded: it also means a data-URI truncated at the first `;`. Read the tail of
+the message, and always read back before repairing.
+
+**No page deletion via MCP.** `data_pages_tool` exposes create/update/branches/schema — there is no
+delete_page. A throwaway probe page must be deleted by hand in the Designer.

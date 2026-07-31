@@ -185,7 +185,8 @@ if (exists(REPO)) {
 
 // ---------- 6. verification scripts present ----------
 for (const s of ['shot-el.js', 'state-shot.js', 'motion-verify.js', 'pixel-diff.js', 'ref-extract.js',
-  'verify-section.js', 'page-audit.js', 'dom-contract.js', 'ref-integrity.js', 'ref-digest.js']) {
+  'verify-section.js', 'page-audit.js', 'dom-contract.js', 'ref-integrity.js', 'ref-digest.js',
+  'wf-preflight.js', 'skeletons.json']) {
   if (!exists(path.join(MEM, 'scripts', s)) && !exists(path.join(MEM, s))) err('missing-script', `verification script absent: ${s}`, 'scripts');
 }
 

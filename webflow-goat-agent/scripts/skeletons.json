@@ -1,0 +1,65 @@
+{
+  "_": "Machine-readable map of what data_element_builder ACTUALLY creates. Probed live against Webflow MCP 2.0.1 on 2026-07-31 with one Slider/Tabs/Form/Lightbox/CMSCollection/YouTubeVideo/Blockquote/TextBlock/RichText/Dropdown on a throwaway draft page, then one depth -1 read. Regenerate the same way when the MCP server version changes; do not hand-edit from memory.",
+  "probedAgainst": "Webflow MCP 2.0.1",
+  "probedOn": "2026-07-31",
+
+  "childIdsAreDerivable": {
+    "finding": "An auto-skeleton module's generated children carry ids that are SEQUENTIAL HEX INCREMENTS of the parent element id (last segment). Slider root ...1c59a72ff346 -> mask ff347 -> slide ff348 -> slide ff349 -> arrow ff34a -> icon ff34b -> arrow ff34c -> icon ff34d -> nav ff34e. Same pattern held for Tabs, Form, Dropdown, CMS and RichText.",
+    "useFor": "Predict child ids instead of spending a discovery read_back per module. Order is the depth-first order listed in `children` below.",
+    "safety": "PREDICT then PROVE. Use predicted ids for the write batch, then let the mandatory post-batch count/read verify. Never report a build as done on predicted ids alone — the increment is an implementation detail that can change with the MCP server version."
+  },
+
+  "batchIsAllOrNothing": {
+    "finding": "A single invalid child placement fails the WHOLE data_element_builder batch and rolls everything back. Placing FormSelect outside a Form returned `MPS rejected update: ... Select Field can only be placed in a Form.` and the page was left with ZERO children — none of the other 9 valid elements survived.",
+    "contrast": "A missing STYLE behaves differently: it returns `partial_success` and the elements ARE created (only the style application fails). Two different failure modes behind similar-looking responses — always read back before repairing.",
+    "note": "`MPS rejected update` is an overloaded error. Known causes: invalid child placement (this) and a data-URI value truncated at the first `;` (see error_learnings 2026-07-26). Read the tail of the message, not the prefix."
+  },
+
+  "modules": {
+    "Slider": { "createdType": "SliderWrapper", "children": ["SliderMask", "SliderSlide", "SliderSlide", "SliderArrow", "Icon", "SliderArrow", "Icon", "SliderNav"],
+      "defaults": { "slides": 2 }, "placeholders": [], "iconFontChildren": ["Icon"],
+      "notes": "Only TWO slides by default — a design with N slides needs N-2 more SliderSlide appended into SliderMask. Arrows contain Webflow ICON-FONT Icon elements: they cannot take an image asset. To use the design's own arrow art, hide the Icon (display:none class) and append an Image." },
+    "Tabs": { "createdType": "TabsWrapper", "children": ["TabsMenu", "TabsLink", "Block", "String", "TabsLink", "Block", "String", "TabsLink", "Block", "String", "TabsContent", "TabsPane", "TabsPane", "TabsPane"],
+      "defaults": { "tabs": 3 }, "placeholders": ["Tab 1", "Tab 2", "Tab 3"],
+      "notes": "Each TabsLink wraps a Block that wraps the String. That Block does NOT accept set_text (same class as TextBlock) — remove it and append a Paragraph/TextBlock, or the tab keeps saying 'Tab 1'." },
+    "Form": { "createdType": "FormWrapper", "children": ["FormForm", "FormBlockLabel", "String", "FormTextInput", "FormBlockLabel", "String", "FormTextInput", "FormButton", "FormSuccessMessage", "Block", "String", "FormErrorMessage", "Block", "String"],
+      "defaults": { "fields": 2 },
+      "placeholders": ["Name", "Email Address", "Thank you! Your submission has been received!", "Oops! Something went wrong while submitting the form.", "Email Form", "email-form"],
+      "notes": "Ships a Name + Email form with attribute ids `name`/`email`, form name 'Email Form', and BOTH success and error message blocks with English copy. Every one of those strings is placeholder content that fails the Rule 14 content gate if the design says otherwise. FormTextInput placeholder text is NOT settable via MCP (see impossible_cases)." },
+    "FormSelect": { "createdType": "FormSelect", "children": [], "placementConstraint": "Form",
+      "notes": "MUST be created inside a Form subtree. Creating it elsewhere aborts and rolls back the entire batch." },
+    "Lightbox": { "createdType": "LightboxWrapper", "children": ["Image"], "placeholders": [],
+      "notes": "Arrives with one empty Image child — bind an asset or it renders a broken slot." },
+    "CMSCollection": { "createdType": "DynamoWrapper", "children": ["DynamoList", "DynamoItem", "DynamoEmpty", "Block", "String"],
+      "defaults": { "items": 1 }, "placeholders": ["No items found."],
+      "notes": "DynamoEmpty carries 'No items found.' — real copy or the content gate fails. The wrapper still needs its collection bound before it renders items." },
+    "Dropdown": { "createdType": "DropdownWrapper", "children": ["DropdownToggle", "Icon", "Block", "String", "DropdownList", "DropdownLink", "String", "DropdownLink", "String", "DropdownLink", "String"],
+      "defaults": { "links": 3 }, "placeholders": ["Dropdown", "Link 1", "Link 2", "Link 3"], "iconFontChildren": ["Icon"],
+      "notes": "Toggle = icon-font Icon + a Block holding the label String. The Block rejects set_text; remove it and append a Paragraph. Hide the Icon when the design supplies its own chevron asset." },
+    "RichText": { "createdType": "RichText",
+      "children": ["Heading", "Heading", "Heading", "Heading", "Heading", "Heading", "Paragraph", "Blockquote", "Paragraph", "List", "ListItem", "ListItem", "ListItem", "Paragraph", "List", "ListItem", "ListItem", "ListItem", "Paragraph", "Link", "Paragraph", "Strong", "Paragraph", "Emphasized", "Paragraph", "Superscript", "Paragraph", "Subscript"],
+      "placeholders": ["Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6", "Lorem ipsum dolor sit amet", "Block quote", "Ordered list", "Item 1", "Item 2", "Item 3", "Unordered list", "Item A", "Item B", "Item C", "Text link", "Bold text", "Emphasis", "Superscript", "Subscript", "university.webflow.com"],
+      "notes": "WORST offender: a full sample document including LOREM IPSUM and a hardcoded https://university.webflow.com/... link. Never create a RichText and leave it — strip the sample tree first, or do not use RichText for static content." },
+    "TextBlock": { "createdType": "Block", "children": ["String"], "placeholders": ["This is some text inside of a div block."],
+      "setTextOnCreate": false,
+      "notes": "Requesting TextBlock yields a generic Block. set_text passed at creation is SILENTLY IGNORED — verified: passing 'PROBE textblock' still produced the default string. Use Paragraph (or Heading/Blockquote) for text that must be set on creation." },
+    "Blockquote": { "createdType": "Blockquote", "children": ["String"], "setTextOnCreate": true,
+      "notes": "set_text DOES work on creation — verified." },
+    "YouTubeVideo": { "createdType": "YouTubeVideo", "children": [], "placeholders": [],
+      "notes": "Leaf element, no skeleton. Needs its video url set via settings." },
+    "Navbar": { "createdType": null, "available": false,
+      "notes": "NOT in the element_schema type enum at all (Tabs/Slider/Dropdown/Lightbox/Form are). get_more_tools ELEMENTS returned 'we have shown you the full tool list'. An API-built header therefore cannot be a real Navbar and has no hamburger. See impossible_cases.md." }
+  },
+
+  "setTextSafeTypes": ["Paragraph", "Heading", "Blockquote", "Button", "TextLink", "LinkBlock"],
+  "setTextUnsafeTypes": ["TextBlock", "Block", "DropdownToggle-inner-Block", "TabsLink-inner-Block"],
+  "iconFontTypes": ["Icon"],
+  "allPlaceholderStrings": [
+    "This is some text inside of a div block.", "Tab 1", "Tab 2", "Tab 3", "Dropdown",
+    "Link 1", "Link 2", "Link 3", "No items found.", "Name", "Email Address",
+    "Thank you! Your submission has been received!", "Oops! Something went wrong while submitting the form.",
+    "Lorem ipsum dolor sit amet", "Heading 1", "Heading 2", "Heading 3", "Heading 4", "Heading 5", "Heading 6",
+    "Block quote", "Ordered list", "Unordered list", "Item 1", "Item 2", "Item 3", "Item A", "Item B", "Item C",
+    "Text link", "Bold text", "Emphasis", "Superscript", "Subscript", "university.webflow.com"
+  ]
+}

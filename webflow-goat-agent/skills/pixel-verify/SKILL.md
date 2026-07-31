@@ -73,7 +73,7 @@ Exit 0 only if **every** expected property equals the contract. Paste the `EVIDE
 Proven to catch, in one negative test, what pixels cannot:
 `background-color #835E2D vs #835E2C` (one hex digit, four small circles) - `letter-spacing 7.93px vs 13.28px` - a **font fallback** (`resolved to "Yrsa, sans-serif" - expected "Inter" first`) - `count: 5 elements, expected 7` - `box.h 1 != 2`.
 
-The contract is authored from the SOURCE (Figma/HTML values), never from the built page - a contract emitted from your own build only proves the build equals itself. `dom-contract.js emit <url> <rootSel> <out.json>` exists to bootstrap the selector list and to catch later regressions; replace its values with source values before using it as a gate.
+The contract is authored from the SOURCE (Figma/HTML values), never from the built page. **Status: hand-authored today, which is a known weakness** — hand transcription is exactly what produced the letter-spacing and flex-vs-absolute defects this gate exists to catch, and it does not scale to a 14-section page. Generating the contract from the cached node data is the next step; until then, treat a hand-written contract as a second pair of eyes on your own transcription, not as independent truth - a contract emitted from your own build only proves the build equals itself. `dom-contract.js emit <url> <rootSel> <out.json>` exists to bootstrap the selector list and to catch later regressions; replace its values with source values before using it as a gate.
 
 Gate order is now: **0.5 reference integrity -> 1.0 property equality -> 1.5/1.6/1.7 content, icons, effects -> 1.9 a11y -> 3 visual compare (coarse safety net).** A section with a green pixel score and a red property diff is NOT done.
 
