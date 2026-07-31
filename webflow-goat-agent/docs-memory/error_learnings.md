@@ -91,3 +91,34 @@ weights 500/600/700 means the family is variable. Register once via `create_font
 `axes: [{tag:"wght",min,max,default_value}]`, POST the bytes, and `font-weight` then selects the
 instance — confirmed by a 99.93% pixel match on a 70px/600 Yrsa headline. Do not try to register the
 same file three times: `file_hash` is content-addressed, so the three records collide.
+
+## 2026-07-31 — kush-header build (node 1:4897)
+
+**A flex column anchored by `left` centres on its WIDEST child, not on the axis the design uses.**
+The brand (logo + wordmark + tracked sub-line) was built as `position:absolute; left:32px; flex-column;
+align-items:center`, so the whole group centred on the very wide letter-spaced "OF FRAGRANCES" and sat
+**66px right** of the reference. Figma expressed it as three absolutely-positioned children each with
+`translateX(-50%)` at `left:61px` — i.e. all centred on the LOGO axis. Fix: give the column the logo's
+width (`width:55px`); wider nowrap children then overflow symmetrically, reproducing translateX(-50%).
+Measure this with a bounding-box diff, not by eye — the shift read as "slightly off" but was 66px.
+
+**Figma letterSpacing can contradict the Figma render — the render wins (Rule 1).** The brand sub-line
+reported `tracking-[13.28px]` on a 6.832px font via `styleOverrideTable` spans. Applied literally it
+produced a 162.5px line; the reference render measures 109px, and 10 characters at 13.28px tracking
+cannot fit 109px at any interpretation. Built to the measured render width (7.93px) and logged the
+contradiction. Always bbox-measure a tracked line against the render before trusting the number.
+
+**Verify the capture and the reference describe the SAME BOX.** Scoring a full-width `.kush-nav`
+(1920px) against a reference cropped to the inner bar (1632px) made pixel-diff upscale the reference
+1.18x: it reported "height delta 16.1% (118 vs 99)" and six middle-right hot regions on a build that
+was actually fine. A right-edge cluster of hot regions plus a large height delta is the signature of a
+width mismatch, not a layout bug. Composite the reference at the capture width first (here: paste the
+1632px header at x=144 on #FDF9EA to rebuild the 1920px frame) — that alone moved the score from
+94.56% to 98.29%.
+
+**Dropdown auto-skeletons ship placeholder CONTENT, not just structure.** A bare `Dropdown` arrives as
+DropdownToggle(Icon + Block "Dropdown") + DropdownList(3x DropdownLink "Link 1/2/3"). The toggle's
+inner Block rejects `set_text` ("This element doesn't support text") exactly like TextBlock — remove it
+and append a Paragraph. Delete the three placeholder links unless the design supplies real items, and
+hide the default Icon with a `display:none` class when the design uses its own chevron asset. Always
+grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.

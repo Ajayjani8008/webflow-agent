@@ -53,3 +53,18 @@ Also: SVG uploaded as <img> asset can't be recolored via CSS (color/fill don't a
 Webflow MCP = Data tools (REST) + Designer tools (elements/styles) ONLY. Full webflow_guide_tool (59KB) grepped: zero hits for interaction/ix2/animation/trigger/hover/scroll. No endpoint exists to create ANY interaction programmatically — not even simple ones Designer supports.
 Consequence: ALL IX2 (hover/scroll/load/click/parallax) always → `pending_designer_work.md` for manual Designer recreate. There is no automation path; do NOT re-investigate this in future sessions (wastes tokens).
 Only motion that IS scriptable = class `:hover`/`:focus` + transition longhand via data_style_tool (already covered by CLAUDE.md Rule 3 + portable mode). Prefer these wherever the effect allows.
+
+## Navbar element cannot be created via MCP (2026-07-31, MCP 2.0.1)
+
+`data_element_builder.element_schema.type` has no `Navbar` value. The enum DOES include Tabs, Slider,
+Dropdown, Lightbox, Form and FormSelect, so the child module exists while the parent navigation module
+does not. `get_more_tools` (category ELEMENTS, detailed brief) answered "we have shown you the full
+tool list" — confirmed gap, not a discovery failure.
+
+Consequence: a header built through the API cannot be a real Navbar, so it has no built-in hamburger /
+mobile menu behaviour.
+Native alternative used: styled container + REAL native `Dropdown` elements for the submenu items
+(divs would have been a ban violation there, since Dropdown IS available), and at <=991 the link row
+WRAPS instead of collapsing — every link stays reachable, no content hidden, no invented hamburger.
+To get a true Navbar: convert in the Designer (Designer-only), or wrap this markup in a Navbar and
+re-point the classes.
