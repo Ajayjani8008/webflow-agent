@@ -49,6 +49,34 @@ Verdict handling: `PASS` = every width scored, height within tolerance, no hot r
 
 **Compare scan order:** proportions → layout grid → spacing rhythm → alignment edges → type hierarchy → color blocks → radii → shadows → asset crops. Quantify + locate mismatches ("hero__title 10px lower than reference").
 
+## 0.5 REFERENCE-INTEGRITY GATE — run BEFORE any score exists (v1.11.0, blocking)
+
+`node "$WF/scripts/ref-integrity.js" check <ref.png> <capture.png> [--bg=#RRGGBB]`
+Exit 0 comparable - 1 NOT comparable - 2 IO. **A score computed on a non-comparable pair is not evidence, it is noise.** Never report a percentage until this exits 0.
+
+Three defects it catches, all measured on real builds:
+- **wrong backdrop** - `get_screenshot`/`download_assets` on an isolated node renders it on an opaque **white** canvas (0 transparent px) even when the node is a transparent overlay. A real header reference was white where the page is `#FDF9EA`: **83% of pixels differed and pixelmatch still returned "99.11% PASS"**. Re-scored against a correct reference: **99.10%** - i.e. the pixel gate was *completely blind* to a wrong backdrop, so it will also pass a wrong BUILD. This is the single strongest reason property equality (§1.0) outranks pixels.
+- **wrong box** - scoring a 1920-wide capture against a 1632-wide reference makes pixel-diff upscale the reference 1.18x and invent a "16.1% height delta" plus six right-edge hot regions on a sound build. Cost two verification runs and a publish. A right-edge hot-region cluster + a large height delta is the *signature* of a width mismatch, not a layout bug.
+- **degenerate reference** - a Figma mask group can export as a **1x1** PNG (149 bytes). Check dimensions before treating an export as an asset.
+
+Fixing a reference, in order of preference:
+1. `ref-integrity.js crop <parentFrame.png> <out> <x> <y> <w> <h>` - cut the section out of its PARENT frame render so the true backdrop travels with it. **This is the correct source of truth.**
+2. `ref-integrity.js compose <node.png> <out> <frameW> <frameH> <x> <y> --bg=#RRGGBB --drop-canvas` - fallback for an isolated export; `--drop-canvas` flood-fills the border-touching canvas colour away from the edges so interior white artwork survives.
+
+## 1.0 PROPERTY-EQUALITY GATE — the PRIMARY accuracy gate (v1.11.0)
+
+`node "$WF/scripts/dom-contract.js" verify <url> <specs/<section>.contract.json> --width=1920`
+Exit 0 only if **every** expected property equals the contract. Paste the `EVIDENCE dom-contract` line verbatim.
+
+**Why this outranks the pixel score.** A percentage cannot see a wrong value that covers little area, and it can never reach 100% even on a perfect build, because Figma and Chrome rasterise glyphs differently - measured, of 3,719 strongly-deviating pixels in a PASSing header, **3,127 sat on glyph edges** and the rest were a reference artifact. So chasing "99.99% pixels" spends tokens on antialiasing noise. Property equality is the reachable, meaningful target, and it is the **cheapest gate that exists** - it reads numbers, never images.
+
+Proven to catch, in one negative test, what pixels cannot:
+`background-color #835E2D vs #835E2C` (one hex digit, four small circles) - `letter-spacing 7.93px vs 13.28px` - a **font fallback** (`resolved to "Yrsa, sans-serif" - expected "Inter" first`) - `count: 5 elements, expected 7` - `box.h 1 != 2`.
+
+The contract is authored from the SOURCE (Figma/HTML values), never from the built page - a contract emitted from your own build only proves the build equals itself. `dom-contract.js emit <url> <rootSel> <out.json>` exists to bootstrap the selector list and to catch later regressions; replace its values with source values before using it as a gate.
+
+Gate order is now: **0.5 reference integrity -> 1.0 property equality -> 1.5/1.6/1.7 content, icons, effects -> 1.9 a11y -> 3 visual compare (coarse safety net).** A section with a green pixel score and a red property diff is NOT done.
+
 ## 1. Structure read-back (evidence, not attestation)
 
 **POST-BATCH COUNT CHECK — after EVERY `data_element_builder` call, not just final verify.** Builder can silently duplicate a whole subtree (slow/retried bridge call → second content block, contiguous ids). Query direct-child count (depth 1-2) = what you built; duplicate/orphan → `remove_element` NOW, before styling.
@@ -185,7 +213,9 @@ Any one of the three failing = FAIL → read the named regions → fix pass. Sco
 
 **EVIDENCE RULE — the score is the tool's output, never your sentence.** The `EVIDENCE pixel-diff` block is pasted verbatim into the report (§5). A report carrying a number without the block is not a passed gate, it is an unverified claim; the same applies to `page-audit`, `state-shot` and `motion-verify` output. Regression suite for the gate itself: `node "$WF/scripts/pixel-diff.test.js"` (5 cases, must stay green after any change to the differ).
 
-**IMAGE DISCIPLINE — measurement replaces eyeballing ONLY where it is strictly stronger (v1.10.0).** Opening a PNG costs ~1-2k tokens *and stays in context for the rest of the session*, so an unnecessary image view is paid for again on every later call. The rule is not "look less", it is **look where looking adds information**:
+**IMAGE DISCIPLINE — measurement replaces eyeballing (v1.11.0, recalibrated).** Opening a PNG costs **5k-66k tokens** (measured: 66,328 / 1920x900 - 46,314 / 355x323 - 14,603 / 1920x117), not the ~1-2k this skill claimed until v1.11.0 - a 20-60x error, and it stays in context for the rest of the session so it is paid again on every later call. Six views in one session = 229,373 tokens = 73% of a two-section build.
+
+**Budget: ONE image view per section, maximum.** Everything the eye was doing is now measured: `ref-digest.js` answers Rule 1 (gradients, blur/shadow, overlaps, wrap points) and `dom-contract.js` proves every property. Spend the one view only when digest and measurement disagree, or on a FAIL whose hot regions do not localise the cause. The rule is no longer "look where looking adds information" - it is **measure first, and look only when measurement is exhausted**:
 
 | Situation | Do |
 |---|---|
