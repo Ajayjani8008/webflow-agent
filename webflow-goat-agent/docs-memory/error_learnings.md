@@ -45,3 +45,19 @@ Causes 1/4/5 = Designer work, not API-fixable.
 - [2026-07-28] cost: strict fail-closed gates COST tokens (more FAILs → more fix passes) and that is the correct trade — but it must be visible, so a section reports at ~60k and stops to ask at ~100k. A cost checkpoint is a report, never permission to leave a CRITICAL/MAJOR diff open.
 - [2026-07-28] verify: `element_snapshot_tool` is free of *publishing*, not free of tokens — it returns an image. Use a text read-back to learn a value, a snapshot only to SEE something. The old pack called snapshots "free", which encouraged exactly the wrong habit.
 
+
+## 2026-07-26 — nshero build (node 709:2702)
+
+**data-URI backgrounds are IMPOSSIBLE via data_style_tool.** The style store TRUNCATES the value at the first `;`, leaving `url("data:image/svg+xml` — for both `;utf8,` and `;base64,`. Worse, the truncated value is then unreconcilable: further `update_style` calls on that class fail with `MPS rejected update ... [Conflict]`, which reads like a transient multiplayer error but is not — the only recovery is to clear the property, then write fresh. FIX: never inline a data-URI. Upload the file (data_assets_tool create_asset -> presigned S3 POST -> hostedUrl) and set `background-image: url(<cdn hostedUrl>)`. CDN URLs contain no `;` so they store intact, and unlike data-URIs they also render on the Designer canvas.
+
+**Figma "image" layers are raster and easy to miss.** A named `image` frame in the layer stack is a bitmap, not vectors/text — invisible in JSON property dumps but carrying real content (here: grid + threat-actor labels + 4 comet streaks). `get_metadata` reveals it; `download_assets` -> `rawImages[]` gives the exact source file. Always check the metadata layer stack for `image` frames before declaring a background complete.
+
+**Hex/shape "outlines" in Figma are usually filled masks, not strokes.** cs-hex-b read as an outline in the render, but the source is a hex-masked gradient FILL at opacity 0.6. Building it as an SVG stroke produced a hollow hex with a red rim instead of a solid plate — cost a rebuild of 5 assets. Read the mask+fill structure from get_design_context before authoring the SVG.
+
+**A Figma layer at `opacity: 0` is an animation layer, not a missing element.** cs-ping is a full accent-filled hex at opacity 0 — correct to omit statically, belongs in the motion queue. Don't "fix" it into visibility.
+
+**mix-blend-mode does not reproduce Figma blend layers in Webflow.** A child div with `background rgba(255,255,255,0.25)` + `mix-blend-mode: saturation` rendered as a visible white box (no isolation context), a regression vs the plain icon. Equivalent native result: `filter: saturate(75%)` on the icon class (25%-alpha blend against white == 75% saturation retained). One property, no extra element.
+
+**MCP publish can silently no-op.** `publish_site` returned success 3x while `lastPublished` stayed frozen and the published HTML never gained the section — then started working later with no change in the call. Never trust the publish response: poll `get_site.lastPublished` or grep the published HTML for a class you just added before shooting.
+
+**Score against the reference PNG's TRUE dimensions.** The 709:2702 reference is 1400x876 (aspect 1.598 = the 1920x1200.9 frame). Resizing the build shot to 1400x900 stretched it 2.7% and scored 96.63% FAIL; at the correct 1400x876 the same build scored 97.90% PASS. Always read the reference header dims first — a wrong-aspect compare invents diffs everywhere.

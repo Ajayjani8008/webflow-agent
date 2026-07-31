@@ -26,28 +26,30 @@ SKILLS=(build-reference cms-build component-build custom-code-once design-intake
         html-intake motion-build pixel-verify portable-mode responsive-pass session-recovery
         url-intake webflow-help webflow-platform)
 
-# live path : repo path
+# live path <TAB> repo path — a TAB separator, because a Windows repo path
+# contains a drive-letter colon and ${pair##*:} would eat it.
+TAB=$'	'
 PAIRS=(
-  "$LIVE/agents/webflow/webflow-goat.md:$REPO/agents/webflow-goat.md"
-  "$LIVE/rules/webflow/core.md:$REPO/rules/webflow-core.md"
-  "$MEM/error_learnings.md:$REPO/docs-memory/error_learnings.md"
-  "$MEM/impossible_cases.md:$REPO/docs-memory/impossible_cases.md"
-  "$MEM/how-to-use.md:$REPO/how-to-use.md"
-  "$MEM/package.json:$REPO/scripts/package.json"
+  "$LIVE/agents/webflow/webflow-goat.md$TAB$REPO/agents/webflow-goat.md"
+  "$LIVE/rules/webflow/core.md$TAB$REPO/rules/webflow-core.md"
+  "$MEM/error_learnings.md$TAB$REPO/docs-memory/error_learnings.md"
+  "$MEM/impossible_cases.md$TAB$REPO/docs-memory/impossible_cases.md"
+  "$MEM/how-to-use.md$TAB$REPO/how-to-use.md"
+  "$MEM/package.json$TAB$REPO/scripts/package.json"
 )
-for s in "${SKILLS[@]}"; do PAIRS+=("$LIVE/skills/$s/SKILL.md:$REPO/skills/$s/SKILL.md"); done
+for s in "${SKILLS[@]}"; do PAIRS+=("$LIVE/skills/$s/SKILL.md$TAB$REPO/skills/$s/SKILL.md"); done
 for f in "$MEM"/scripts/*.js "$MEM"/scripts/*.sh; do
   [[ -e "$f" ]] || continue
-  PAIRS+=("$f:$REPO/scripts/$(basename "$f")")
+  PAIRS+=("$f$TAB$REPO/scripts/$(basename "$f")")
 done
 # the per-site template always travels with the pack (files at the top level, plus specs/)
 for f in "$MEM"/sites/_template/*; do
   [[ -f "$f" ]] || continue
-  PAIRS+=("$f:$REPO/docs-memory/sites/_template/$(basename "$f")")
+  PAIRS+=("$f$TAB$REPO/docs-memory/sites/_template/$(basename "$f")")
 done
 for f in "$MEM"/sites/_template/specs/*; do
   [[ -f "$f" ]] || continue
-  PAIRS+=("$f:$REPO/docs-memory/sites/_template/specs/$(basename "$f")")
+  PAIRS+=("$f$TAB$REPO/docs-memory/sites/_template/specs/$(basename "$f")")
 done
 # real sites: sync the three state files IF the repo already tracks that site, so outstanding
 # Designer work and the class registry survive a restore. Caches (figma-cache/ref-cache) never
@@ -58,7 +60,7 @@ for d in "$MEM"/sites/*/; do
   [[ "$site" == "_template" ]] && continue
   [[ -d "$REPO/docs-memory/sites/$site" ]] || continue
   for n in registry.md build_state.json pending_designer_work.md; do
-    [[ -f "$d$n" ]] && PAIRS+=("$d$n:$REPO/docs-memory/sites/$site/$n")
+    [[ -f "$d$n" ]] && PAIRS+=("$d$n$TAB$REPO/docs-memory/sites/$site/$n")
   done
 done
 
@@ -66,7 +68,7 @@ sum() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1; }
 
 drift=0; copied=0; missing=0
 for pair in "${PAIRS[@]}"; do
-  live="${pair%%:*}"; repo="${pair##*:}"
+  live="${pair%%"$TAB"*}"; repo="${pair##*"$TAB"}"
   rel="${live#"$HOME"/}"
   if [[ ! -f "$live" ]]; then echo "MISSING LIVE  $rel"; missing=$((missing+1)); continue; fi
   if [[ -f "$repo" ]] && [[ "$(sum "$live")" == "$(sum "$repo")" ]]; then continue; fi
