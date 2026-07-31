@@ -22,6 +22,7 @@ const MEM = path.join(HOME, 'docs/memory/webflow');
 const REPO = (() => {
   if (process.env.WF_REPO) return process.env.WF_REPO;
   const candidates = [
+    'My_Projects/My_Agents/webflow-agent/webflow-goat-agent',
     'My_Projects/My_Agents/webflow-agent-main/webflow-agent/webflow-goat-agent',
     'Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent',
   ].map((p) => path.join(HOME, p));

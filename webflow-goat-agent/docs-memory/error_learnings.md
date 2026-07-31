@@ -61,3 +61,33 @@ Causes 1/4/5 = Designer work, not API-fixable.
 **MCP publish can silently no-op.** `publish_site` returned success 3x while `lastPublished` stayed frozen and the published HTML never gained the section — then started working later with no change in the call. Never trust the publish response: poll `get_site.lastPublished` or grep the published HTML for a class you just added before shooting.
 
 **Score against the reference PNG's TRUE dimensions.** The 709:2702 reference is 1400x876 (aspect 1.598 = the 1920x1200.9 frame). Resizing the build shot to 1400x900 stretched it 2.7% and scored 96.63% FAIL; at the correct 1400x876 the same build scored 97.90% PASS. Always read the reference header dims first — a wrong-aspect compare invents diffs everywhere.
+
+## 2026-07-31 — kush-hero build (Kush file, node 1:1081)
+
+**A BEM modifier only applies if it EXISTS as a real combo class.** `data_element_builder` `set_style`
+and `data_element_tool` `set_style` both reject `style_names: [base, modifier]` with
+`One or more styles not found: <base>, <modifier>` when the modifier was created as a plain global
+class — even though both classes demonstrably exist. The pair is resolved as a combo-class CHAIN, so
+the modifier must be created with `parent_style_names: [base]` (result then reports
+`isComboClass: true`, `selector: ".base.modifier"`). Fix: `remove_style` the global modifier, re-create
+it with `parent_style_names`, then apply both names. Single-class application always works, which is
+why this only bites on modifiers.
+
+**`data_element_builder` under-reports success — always run the post-batch read.** The call returned
+`partial_success` listing only a handful of children, which read as "most of the tree failed". A
+`query_elements` with `children_depth: -1` showed the ENTIRE tree had in fact been created correctly
+(heading, paragraph with em-dash intact, link, label, icon, all three dots); the only real failures
+were the four combo-class applications above. Never repair from the builder's response — diff against
+a fresh subtree read, or you will duplicate elements that already exist.
+
+**A Figma group can export as a 1x1 empty PNG.** Node 1:1089 "Pattern" (940x677, 20+ raw images in
+its subtree) exported at 149 bytes / 1x1 via both `download_assets` and `get_screenshot
+contentsOnly` — it is a mask group that does not render standalone. The visible product art was
+entirely in a sibling (1:4887, a rounded-rect with an image fill). Check an export's real dimensions
+before treating it as an asset, and confirm which node actually carries the artwork by LOOKING at it.
+
+**Google Fonts variable faces install fine as Webflow custom fonts.** CSS2 returning ONE url for
+weights 500/600/700 means the family is variable. Register once via `create_font` with
+`axes: [{tag:"wght",min,max,default_value}]`, POST the bytes, and `font-weight` then selects the
+instance — confirmed by a 99.93% pixel match on a 70px/600 Yrsa headline. Do not try to register the
+same file three times: `file_hash` is content-addressed, so the three records collide.

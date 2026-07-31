@@ -18,7 +18,7 @@ if [[ -z "$REPO" ]]; then
            "$HOME/Ajay/My_Project/agent/webflow-agnet/webflow-goat-agent"; do
     [[ -d "$c" ]] && REPO="$c" && break
   done
-  REPO="${REPO:-$HOME/My_Projects/My_Agents/webflow-agent-main/webflow-agent/webflow-goat-agent}"
+  REPO="${REPO:-$HOME/My_Projects/My_Agents/webflow-agent/webflow-goat-agent}"
 fi
 APPLY=0; [[ "${1:-}" == "--apply" ]] && APPLY=1
 
