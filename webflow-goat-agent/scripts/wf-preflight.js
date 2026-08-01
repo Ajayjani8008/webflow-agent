@@ -13,7 +13,11 @@
 // Code does. This is that code.
 //
 // Usage:
-//   node wf-preflight.js <plan.json> [--json]
+//   node wf-preflight.js <plan.json> [--json] [--site-prefix=<id>] [--known-prefixes=a,b,c]
+//        --site-prefix / --known-prefixes let it reject a block prefix that belongs to neither the
+//        site nor an existing registry convention. A header + hero once shipped 48 classes prefixed
+//        with the FIGMA FILE NAME ("kush-") onto a site called new-hive-pro-design; the rules said
+//        "BEM kebab-case" and never said where the block name comes from, so the filename filled it.
 //   node wf-preflight.js --self-test
 //
 // Exit 0 clean · 1 blockers found · 2 usage/IO error.
@@ -29,6 +33,7 @@ const fs = require('fs'); const path = require('path');
 const argv = process.argv.slice(2);
 const JSONOUT = argv.includes('--json');
 const SELFTEST = argv.includes('--self-test');
+const argvOpt = n => { const p = '--' + n + '='; const a = argv.find(x => x.startsWith(p)); return a ? a.slice(p.length) : null; };
 const SK = JSON.parse(fs.readFileSync(path.join(__dirname, 'skeletons.json'), 'utf8'));
 
 // CSS shorthands that must be expanded to longhand, and what they expand to.
@@ -76,8 +81,11 @@ const IMITATION_RE = {
 // intrinsic UI keeps bare px widths; everything else is fluid-first (Rule 7)
 const INTRINSIC_RE = /(icon|avatar|logo|badge|dot|bullet|chevron|arrow|thumb|swatch|divider|rule|spinner|check)/i;
 const BEM_RE = /^[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$/;
+// A class's block segment is everything before the first __ ; its prefix is the first hyphen group.
+const blockOf = n => String(n).split('__')[0];
 
-function check(plan) {
+function check(plan, o) {
+  o = o || {};
   const blockers = [], warnings = [];
   const B = (kind, where, msg, fix) => blockers.push({ kind, where, msg, fix });
   const W = (kind, where, msg, fix) => warnings.push({ kind, where, msg, fix });
@@ -248,6 +256,29 @@ function check(plan) {
       'block, block__element, block__element--modifier — keeps the registry dedupable');
   }
 
+  // ---- FIX 4: the block prefix must belong to the site, not to the source file ----
+  const sitePrefix = String(o.sitePrefix != null ? o.sitePrefix : (argvOpt('site-prefix') || '')).toLowerCase();
+  const known = String(o.known != null ? o.known : (argvOpt('known-prefixes') || '')).toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+  if (sitePrefix || known.length) {
+    const allowed = new Set(known);
+    if (sitePrefix) {
+      allowed.add(sitePrefix);
+      // a site id like "new-hive-pro-design" legitimately abbreviates to its initials, "nhp"
+      // a site id like "new-hive-pro-design" legitimately abbreviates to any leading run of its
+      // initials: nh, nhp, nhpd. Accept those, plus any whole word of 3+ chars. "kush" matches none.
+      const initials = sitePrefix.split('-').filter(Boolean).map(w => w[0]).join('');
+      for (let i = 2; i <= initials.length; i++) allowed.add(initials.slice(0, i));
+      sitePrefix.split('-').forEach(w => { if (w.length >= 3) allowed.add(w); });
+    }
+    const blocks = [...new Set(classes.map(c => blockOf(c.name)))];
+    const orphans = blocks.filter(b => ![...allowed].some(a => b === a || b.startsWith(a + '-')));
+    if (orphans.length) {
+      B('block-prefix-foreign', 'classes ' + orphans.slice(0, 4).join(', ') + (orphans.length > 4 ? ' (+' + (orphans.length - 4) + ')' : ''),
+        'block prefix belongs to neither the site (' + (sitePrefix || '-') + ') nor a known registry prefix (' + (known.join(', ') || 'none') + ')',
+        'derive the prefix from build_state.site.id or the section role, and grep registry.md for what this site already uses. A Figma file name, page name or cache key is an accident of where the design lived — renaming the file must not strand the class system.');
+    }
+  }
+
   return { section: plan.section || null, blockers, warnings };
 }
 
@@ -333,6 +364,14 @@ if (SELFTEST) {
   console.log('\nself-test:');
   console.log('  expected blocker kinds present: ' + (missing.length ? 'MISSING ' + missing.join(',') : 'all ' + want.join(', ')));
   console.log('  FormSelect flagged once (outside Form) and NOT flagged inside Form: ' + (selectInForm === 1 ? 'ok' : 'FAIL (' + selectInForm + ')'));
+  // FIX 4: a block prefix from the SOURCE FILE must be blocked; the site's own initials must pass.
+  const prefixPlan = p => ({ section: 'x', classes: [{ name: p, properties: { color: '#000' } }, { name: p + '__row', properties: {} }], tree: { type: 'Section', styleNames: [p] } });
+  const withArgs = (plan, site, known) => check(plan, { sitePrefix: site, known }).blockers.map(b => b.kind);
+  cases.push(['foreign prefix blocked (kush on new-hive-pro-design)', withArgs(prefixPlan('kush-nav'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['site initials accepted (nhp)', !withArgs(prefixPlan('nhp-nav'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['existing registry prefix accepted (hc)', !withArgs(prefixPlan('hc-hero'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['no site-prefix given = check disabled', !withArgs(prefixPlan('kush-nav'), '', '').includes('block-prefix-foreign')]);
+
   let banOk = true;
   for (const [name, ok] of cases) { console.log('  ' + (ok ? 'ok  ' : 'FAIL') + '  ' + name); banOk = banOk && ok; }
   process.exit(missing.length === 0 && selectInForm === 1 && banOk ? 0 : 1);

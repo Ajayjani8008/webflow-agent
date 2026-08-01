@@ -2,6 +2,27 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.1 — 2026-08-01
+
+Closed the four weak points named after the v2.1 build, each with a check rather than a sentence.
+
+- **check-spec** (`text-extents.js`) — decomposes measured ink into glyph advances + tracking, so a
+  source-derived number that cannot fit the render BLOCKS the build. No font metrics needed. The
+  shipped kush-header spec implied -27.9px of glyph advance in a 111px line: caught in one call.
+- **wf-report.js** — measures a section from the transcript (turns · calls · publishes · peak context
+  · new tokens · context re-read · minutes) and `wf-section record` stores it in build_state. The
+  budget stops being something recalled and becomes something measured.
+- **Call floor cut ~14 -> ~9**: one ToolSearch for the whole MCP surface · `wf-section assets` caches
+  the site asset-id map (list_assets is 75KB and blew the response limit twice for seven ids) ·
+  predict native-module child ids from skeletons.json instead of read-then-remove-then-append.
+- **Block-prefix check enforced**: `wf-preflight --site-prefix= --known-prefixes=` accepts the site id,
+  any leading run of its initials and any 3+ char word, and blocks anything else. 48 classes once
+  shipped prefixed with a Figma file name.
+- **§ G, the two real limits** — an absent mobile frame is UNSCORED plus invariants, never a score;
+  Interactions have no API, so a section cannot close on an unapplied panel script.
+
+Tests: 8 suites green, 64+ cases (wf-preflight 20, text-extents 9, wf-report 8 new).
+
 ## v2.1 — 2026-08-01
 
 The loop, gated. v2.0 cut the static cost (always-injected 11,700 -> 958 tokens) and every gate fired

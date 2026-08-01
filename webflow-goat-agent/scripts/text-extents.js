@@ -14,6 +14,7 @@
 //   node text-extents.js contract <ref.png> --bands=<label>:<y0>:<y1>,... [--xoff=N] [--out=frag.json]
 //   node text-extents.js bands <ref.png> <built.png> --bands=<label>:<y0>:<y1>,... [--tol=1.5]
 //   node text-extents.js solve --target=<px> --measured=<px> --ls=<px> --gaps=<n>
+//   node text-extents.js check-spec --measured=<px> --font-size=<px> --glyphs=<n> --ls=<px>[:<count>][,…]
 //   node text-extents.js --self-test
 //
 // v2.1 — `contract` runs at INTAKE, before the build. It turns the reference render into measured
@@ -36,7 +37,7 @@ const path = require('path');
 const argv = process.argv.slice(2);
 const flag = n => argv.includes('--' + n);
 const opt = (n, d = null) => { const p = '--' + n + '='; const a = argv.find(x => x.startsWith(p)); return a ? a.slice(p.length) : d; };
-const SUBS = ['contract', 'bands', 'solve'];
+const SUBS = ['contract', 'bands', 'solve', 'check-spec'];
 const SUB = SUBS.includes(argv[0]) ? argv[0] : null;
 const files = argv.filter(a => !a.startsWith('--') && a !== SUB);
 
@@ -94,6 +95,12 @@ if (flag('self-test')) {
   // solve is pure arithmetic: 102px measured at ls 4.4 over 11 gaps, target 111 -> 5.22px
   const solved = 4.4 + (111 - 102) / 11;
   cases.push(['solve is linear and exact', Math.abs(solved - 5.2181818) < 0.001]);
+  // check-spec, on the real kush-header numbers
+  const implied = (measured, track, glyphs, fs2) => ((measured - track) / glyphs) / fs2;
+  const badSpec = 111 - (3.04 * 2 + 13.28 * 10);                       // -27.88 -> impossible
+  const goodSpec = implied(111, 5.07 * 11, 12, 6.832);                 // ~0.67 em -> plausible
+  cases.push(['check-spec catches the impossible spec (negative advances)', badSpec < 0]);
+  cases.push(['check-spec accepts the solved value (0.30-0.80 em)', goodSpec > 0.30 && goodSpec < 0.80]);
   let ok = true;
   for (const [n, c] of cases) { console.log((c ? 'PASS' : 'FAIL') + '  ' + n); ok = ok && c; }
   process.exit(ok ? 0 : 1);
@@ -129,6 +136,55 @@ if (SUB === 'solve') {
   console.log('  target ' + target + 'px · measured ' + measured + 'px at letter-spacing ' + ls + 'px over ' + gaps + ' gaps');
   console.log('  delta ' + rnd(target - measured) + 'px  ->  letter-spacing ' + (Math.round(next * 100) / 100) + 'px');
   console.log('  (ink width is linear in letter-spacing: glyph advances are constant, so ONE measured point solves it)');
+  process.exit(0);
+}
+
+// ── check-spec: does the SPEC's tracking even fit the measured render? (FIX 1) ────────────────
+// Blocks a build whose source-derived numbers are arithmetically impossible against the render.
+// No font metrics required: the implied glyph advance is what falls out of the decomposition.
+if (SUB === 'check-spec') {
+  const measured = Number(opt('measured')), fontSize = Number(opt('font-size')), glyphs = Number(opt('glyphs'));
+  const lsSpec = opt('ls');
+  if (![measured, fontSize, glyphs].every(isFinite) || glyphs < 2 || !lsSpec) {
+    console.error('usage: node text-extents.js check-spec --measured=<px> --font-size=<px> --glyphs=<n> --ls=<px>[:<count>][,<px>:<count>…]');
+    console.error('  --ls entries are letter-spacing values with how many gaps each applies to.');
+    console.error('  Omit :count on a single entry to apply it to all (glyphs-1) gaps.');
+    process.exit(2);
+  }
+  const parts = lsSpec.split(',').map(t => {
+    const [v, c] = t.split(':');
+    return { ls: Number(v), gaps: c === undefined ? glyphs - 1 : Number(c) };
+  });
+  if (parts.some(x => !isFinite(x.ls) || !isFinite(x.gaps))) { console.error('ERR bad --ls spec: ' + lsSpec); process.exit(2); }
+  const trackTotal = parts.reduce((a, x) => a + x.ls * x.gaps, 0);
+  const gapTotal = parts.reduce((a, x) => a + x.gaps, 0);
+  const impliedSum = measured - trackTotal;
+  const perGlyph = impliedSum / glyphs;
+  const ratio = perGlyph / fontSize;
+  // latin text advances land ~0.30-0.80 em; below 0.20 or above 1.0 is not a real typeface
+  const LO = 0.30, HI = 0.80, HARD_LO = 0.20, HARD_HI = 1.0;
+  console.log('EVIDENCE text-extents check-spec');
+  console.log('  measured ink        ' + measured + 'px   font-size ' + fontSize + 'px   glyphs ' + glyphs + '   tracked gaps ' + gapTotal);
+  console.log('  spec tracking total ' + rnd(trackTotal) + 'px  (' + parts.map(x => x.ls + 'px x' + x.gaps).join(' + ') + ')');
+  console.log('  implied advances    ' + rnd(impliedSum) + 'px  ->  ' + rnd(perGlyph) + 'px/glyph  =  ' + (Math.round(ratio * 100) / 100) + ' em');
+  if (impliedSum <= 0) {
+    console.log('  VERDICT IMPOSSIBLE — the spec\'s tracking alone (' + rnd(trackTotal) + 'px) meets or exceeds the whole');
+    console.log('     measured line (' + measured + 'px), leaving ' + rnd(impliedSum) + 'px for the glyphs themselves.');
+    console.log('     The source numbers are not px, or not per-character. DO NOT BUILD from them —');
+    console.log('     solve tracking from the render instead:  text-extents.js solve --target=' + measured + ' …');
+    process.exit(1);
+  }
+  if (ratio < HARD_LO || ratio > HARD_HI) {
+    console.log('  VERDICT IMPLAUSIBLE — ' + (Math.round(ratio * 100) / 100) + ' em per glyph is outside any real latin typeface');
+    console.log('     (' + HARD_LO + '-' + HARD_HI + ' em). Re-read the source, or solve from the render.');
+    process.exit(1);
+  }
+  if (ratio < LO || ratio > HI) {
+    console.log('  VERDICT SUSPECT — ' + (Math.round(ratio * 100) / 100) + ' em per glyph is outside the usual ' + LO + '-' + HI + ' em band.');
+    console.log('     Legal for a condensed or very wide face; confirm against the render before building.');
+    process.exit(0);
+  }
+  console.log('  VERDICT PLAUSIBLE — the spec\'s tracking is consistent with the measured render.');
   process.exit(0);
 }
 

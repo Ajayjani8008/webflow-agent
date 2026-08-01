@@ -20,18 +20,24 @@ Every T1 section runs this. Deviating costs turns, and turns are the whole cost.
 | 2 | **Intake → written spec** | `node "$WF/scripts/wf-section.js" intake …` (chains `figma-parse` → `figma-compile` → contract) or the source's intake skill for screenshot/HTML/URL. Output: `specs/<section>.md` + `specs/<section>.contract.json`. |
 | 3 | **Look at the reference** | Open the reference render. **Mandatory, ~1.5k tokens, never skipped.** Then `ref-digest.js` for gradients/blur/overlap/wrap points you cannot see reliably. |
 | 3b | **MEASURE the reference (v2.1)** | `node "$WF/scripts/text-extents.js" contract <ref.png> --bands=<label>:<y0>:<y1>,… --xoff=<N> --out=specs/<section>.extents.json` — turns the render into numbers **before** the build: true ink left/right/width per text line. Those numbers are what the build must hit. Tracking is then **solved**, never derived: `text-extents.js solve --target= --measured= --ls= --gaps=`. Skipping this is what cost the kush-header build four extra publishes (see § F). |
+| 3c | **Cross-check the spec against the render — BLOCKING** | `node "$WF/scripts/text-extents.js" check-spec --measured=<px> --font-size=<px> --glyphs=<n> --ls=<px>[:<count>],…` — decomposes the measured ink into glyph advances + tracking. Exit 1 = the source's numbers are arithmetically impossible against the render, so **do not build from them**; solve instead. Needs no font metrics. On kush-header the shipped spec implied **−27.9px of glyph advance** in a 111px line: caught in one call, before any write. |
 | 4 | **Preflight the plan** | `node "$WF/scripts/wf-preflight.js" <plan.json>` — validates every type, class, combo, longhand and skeleton BEFORE a single MCP write. Exit 1 = fix the plan, do not build. |
 | 5 | **Build** | SVG upload batch → **ONE** `data_style_tool` batch → **≤2** `data_element_builder` calls (structure + T2 effect children together) → post-batch child-count check. |
 | 6 | **Publish** | Once — `wf-resolve.js --publish`. Publishes 1-2 are free; **#3+ is refused without `--cause="<a root cause not already recorded>"`**, and a repeat of a recorded cause is refused outright. If you cannot name a new root cause you are guessing, and a guess does not earn a publish. |
 | 7 | **Verify — one call** | `node "$WF/scripts/verify-section.js" <url> "<sel>" <outDir> --section= --widths=1440,991,767,390 --ref= --audit --states=…` → every breakpoint shot, every score, a11y/perf, states, in ONE consolidated `EVIDENCE` block. Then `dom-contract.js verify` for property equality. |
 | 8 | **Fix** | ONE batched call. Re-check only open items + 3-5 neighbours. |
-| 9 | **Record** | `node "$WF/scripts/wf-section.js" record …` — build_state + registry + spec statuses in one write. |
+| 9 | **Record** | `node "$WF/scripts/wf-section.js" record …` — build_state + registry + spec statuses in one write. It also runs `wf-report.js` and stores the section's **measured** cost (turns · calls · publishes · peak context · minutes) into `build_state.sections[].cost`. A budget nobody measures is a wish: report the `EVIDENCE wf-report` block verbatim whenever it says OVER BUDGET. |
 
 Re-publish for verification is allowed once (cap 2/section, counted by `wf-resolve`). Publishing per artifact is the process bug.
 **The loop is the cost (v2.1).** `wf-section verify` records verdict+score; a verify that reproduces the previous one closed nothing, and two of those prints **STALLED** — at which point the next step is a *measurement*, never another fix-and-publish. Measured on kush-header: 6 publishes and 4 verify runs against a budget of 15 calls, every one of them because the build targeted spec arithmetic instead of the render.
 **T2:** one section per session. Finish → record → hand off: *"section done and recorded — start the next in a new session, it resumes from build_state."*
 
 **Batching targets (hard):** classes ONE call · elements ≤2 · fix pass ONE per pass · memory ONE write pass. Over target → say why, then continue.
+
+**The call floor is ~9, not ~14 — three measured sources of waste (v2.1):**
+- **Load the MCP surface in ONE `ToolSearch`.** Fetch the standard Webflow set together (`webflow_guide_tool, data_agent_instructions_tool, data_sites_tool, data_pages_tool, data_element_tool, data_element_builder, data_element_settings_tool, data_style_tool, data_assets_tool, data_fonts_tool, element_snapshot_tool, designer_tool`) at the first build call of the session. Fetching them piecemeal cost 3-4 calls on kush-header.
+- **Never call `list_assets` twice.** It returns every asset on the site — 75KB and over the response limit on a 100-asset site, spent twice to learn seven ids. Cache the map once: `wf-section.js assets --put="name=id,…"`, then `--get=` is free forever.
+- **Predict native-module child ids, do not read them back.** `skeletons.json` records each module's created children in depth-first order and `webflow-platform` § ids gives the id-suffix sequence, so a Dropdown's Icon / label Block / 3 links are all derivable from the wrapper id. Read-then-remove-then-append is 3 calls; predicted removal is 1.
 
 ---
 
@@ -107,6 +113,7 @@ Never load the other source's skill or cache for the same job. **Hybrid is legal
 
 BEM kebab-case: `block`, `block__element`, `block__element--modifier`. Reuse > new.
 **The block prefix comes from the SITE or the SECTION ROLE — never from the source file.** A Figma file name, page name or cache key is an accident of where the design happened to live; baking it into the class system leaves the client with classes named after a file that may be renamed tomorrow. Derive it from `build_state.site.id` (or the section role) and match the prefix the site already uses — grep `registry.md` first. Verified failure: a header + hero shipped 48 classes prefixed `kush-` from the Figma file "Kush - Figma To HTML" onto a site called `new-hive-pro-design` that already used `hc-*` and `ns*`. Renaming is safe (`rename_style` keeps styles applied) but it cost 48 calls that never needed to happen.
+**Enforced, not just written (v2.1):** pass the resolved site id and the site's existing prefixes to preflight — `wf-preflight.js <plan.json> --site-prefix=<build_state.site.id> --known-prefixes=<from registry.md>`. It accepts the full site id, any leading run of its initials (`nh`, `nhp`, `nhpd`) and any whole word of 3+ characters, and **blocks anything else**. Omit the flags and the check is simply off, so always pass them.
 Variable families `--color-*`, `--space-*` (4→192), `--font-size-*` (12→72), `--radius-*`, `--duration-*`/`--easing-*`.
 Dedup: colour ±15/channel, spacing ±10%, else a NEW exact-value variable — never round >10%. Portable mode → raw values.
 
@@ -130,6 +137,21 @@ surfacing another site's pending items · writing any code without a written des
 proposing or self-invoking `/custom-code-once` · reusing a past permission · starting from the reference's DOM instead of the native module map.
 
 Run `node "$WF/scripts/wf-lint.js"` after any pack edit. Run `node "$WF/scripts/wf-preflight.js" <plan.json>` before any build.
+
+---
+
+## G. The two limits that are real — never report around them
+
+**1. No mobile/tablet frame in the source.** No tool can score against a reference that does not exist. When the hunt (design-intake §A.8 / url-intake / html-intake) genuinely finds none:
+- say **UNSCORED**, name the widths, and never let a derived value be reported as a matched one;
+- derive deterministically instead of ad-hoc — same breakpoint transforms every time (fluid base, stack order, gap scale), recorded in the spec so the next section matches this one;
+- still enforce the **invariants**, which need no reference: zero horizontal overflow · touch targets ≥44px · no clipped or blank text band (`text-extents bands`) · a11y/perf budgets (`page-audit`) · proportional spacing rhythm. Invariants are not a pixel score and must never be printed as one;
+- the only real fix is asking for the frames. Say so once, plainly, and move on.
+
+**2. Interactions have no API.** Confirmed repeatedly: `designer_tool` exposes zero interaction actions and the registry returns the full tool list for INTERACTIONS. So motion is always a Designer handoff. What that must never become is an unverified claim:
+- emit the panel build-script for the whole page in ONE handoff, exact field names from `registry.md ## Motion-Panel`;
+- log it `[critical]` in `pending_designer_work.md`;
+- **a section does not close on an unapplied script** — `motion-verify.js` must measure the animation actually running (moved, timing within 10%, zero jank props, reduced-motion honoured) before the row flips from `interactions-queued` to `built`.
 
 ---
 

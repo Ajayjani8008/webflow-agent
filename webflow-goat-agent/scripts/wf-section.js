@@ -16,6 +16,10 @@
 //   node wf-section.js verify --site=<dir> --section=<name> --url=<published> --sel="<css>"
 //                             [--widths=1440,991,767,390] [--ref=<dir>] [--states=base,auto]
 //                             [--audit] [--width=1920] [--no-contract]
+//   node wf-section.js assets --site=<dir> --put="name=id,name=id"   |   --get=name1,name2   |   --list
+//        The site's asset-id map, cached in build_state.assets. list_assets returns every asset on the
+//        site and blew the 75KB response limit on a 100-asset site — twice, for seven ids. Cache once,
+//        then it is zero calls forever.
 //   node wf-section.js record --site=<dir> --section=<name> --status=<s> [--score=N]
 //                             [--node-ids=a,b] [--report=…] [--responsive=…] [--a11y=PASS|FAIL:note]
 //                             [--registry="| class | … |"] [--recovery=…]
@@ -195,9 +199,26 @@ function record() {
   st.updated_at = today();
   fs.writeFileSync(statePath, JSON.stringify(st, null, 2));
 
+  // FIX 2: cost is measured from the transcript, not recalled. Stored so a later session can compare.
+  const rep = stage('cost', 'wf-report.js', ['--json', ...(opt('since') ? ['--since=' + opt('since')] : [])], { optional: true });
+  if (!rep.skipped && rep.stdout) {
+    try {
+      const c = JSON.parse(rep.stdout);
+      if (c && !c.error) {
+        sec.cost = { turns: c.turns, calls: c.calls, publishes: c.publishes, peakContext: c.peakContext,
+                     newTokens: c.newTokens, contextReRead: c.cacheRead, minutes: c.minutes, images: c.imgs };
+        fs.writeFileSync(statePath, JSON.stringify(st, null, 2));
+      }
+    } catch (e) { /* a report is never a gate */ }
+  }
+
   const lines = ['EVIDENCE wf-section record  section=' + section,
     '  status    ' + sec.status + (sec.pixel_score ? '   score ' + sec.pixel_score : ''),
     '  state     ' + statePath];
+  if (sec.cost) lines.push('  cost      ' + sec.cost.turns + ' turns · ' + sec.cost.calls + ' calls · ' +
+    sec.cost.publishes + ' publishes · peak ' + Math.round(sec.cost.peakContext / 1000) + 'k' +
+    (sec.cost.minutes != null ? ' · ' + sec.cost.minutes + ' min' : '') +
+    ((sec.cost.calls > 15 || sec.cost.turns > 25 || sec.cost.publishes > 2) ? '   OVER BUDGET — paste the wf-report block in the section report' : '   within budget'));
 
   const reg = opt('registry');
   if (reg) {
@@ -218,6 +239,40 @@ function record() {
     }
   }
   console.log(lines.join('\n'));
+  process.exit(0);
+}
+
+// ── ASSETS: the site's name->id map, cached (FIX 3) ───────────────────────────────────────────
+function assets() {
+  const dir = siteDir();
+  const statePath = path.join(dir, 'build_state.json');
+  const st = readJSON(statePath) || die('unreadable build_state.json at ' + statePath);
+  st.assets = st.assets || {};
+
+  if (opt('put')) {
+    let n = 0;
+    for (const pair of opt('put').split(',')) {
+      const i = pair.indexOf('=');
+      if (i < 1) continue;
+      const k = pair.slice(0, i).trim(), v = pair.slice(i + 1).trim();
+      if (!k || !v) continue;
+      st.assets[k] = v; n++;
+    }
+    fs.writeFileSync(statePath, JSON.stringify(st, null, 2));
+    console.log('EVIDENCE wf-section assets  cached ' + n + ' id(s), ' + Object.keys(st.assets).length + ' total');
+    process.exit(0);
+  }
+  if (opt('get')) {
+    const want = opt('get').split(',').map(s => s.trim()).filter(Boolean);
+    const miss = want.filter(w => !st.assets[w]);
+    console.log('EVIDENCE wf-section assets  ' + (miss.length ? 'INCOMPLETE' : 'HIT') + '  ' + (want.length - miss.length) + '/' + want.length);
+    for (const w of want) console.log('  ' + w.padEnd(28) + (st.assets[w] || 'MISSING'));
+    if (miss.length) console.log('  -> fetch only the missing ones, then cache them with --put=');
+    process.exit(miss.length ? 1 : 0);
+  }
+  const keys = Object.keys(st.assets).sort();
+  console.log('EVIDENCE wf-section assets  ' + keys.length + ' cached for this site');
+  for (const k of keys) console.log('  ' + k.padEnd(28) + st.assets[k]);
   process.exit(0);
 }
 
@@ -255,4 +310,5 @@ if (flag('self-test')) selfTest();
 else if (cmd === 'intake') intake();
 else if (cmd === 'verify') verify();
 else if (cmd === 'record') record();
+else if (cmd === 'assets') assets();
 else die('usage: node wf-section.js <intake|verify|record> --site=<dir> --section=<name> …   |   --self-test');
