@@ -106,6 +106,7 @@ Never load the other source's skill or cache for the same job. **Hybrid is legal
 ## D. Classes & variables
 
 BEM kebab-case: `block`, `block__element`, `block__element--modifier`. Reuse > new.
+**The block prefix comes from the SITE or the SECTION ROLE — never from the source file.** A Figma file name, page name or cache key is an accident of where the design happened to live; baking it into the class system leaves the client with classes named after a file that may be renamed tomorrow. Derive it from `build_state.site.id` (or the section role) and match the prefix the site already uses — grep `registry.md` first. Verified failure: a header + hero shipped 48 classes prefixed `kush-` from the Figma file "Kush - Figma To HTML" onto a site called `new-hive-pro-design` that already used `hc-*` and `ns*`. Renaming is safe (`rename_style` keeps styles applied) but it cost 48 calls that never needed to happen.
 Variable families `--color-*`, `--space-*` (4→192), `--font-size-*` (12→72), `--radius-*`, `--duration-*`/`--easing-*`.
 Dedup: colour ±15/channel, spacing ±10%, else a NEW exact-value variable — never round >10%. Portable mode → raw values.
 
