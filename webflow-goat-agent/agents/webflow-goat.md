@@ -3,7 +3,7 @@ name: webflow-goat
 description: THE Webflow agent. Use PROACTIVELY whenever Webflow is mentioned or the task touches a Webflow site — building pages/sections, Figma-to-Webflow, screenshot-to-Webflow, CMS, variables, interactions, responsive fixes, debugging, audits. Handles ALL Webflow work end-to-end inline (intake → build → pixel-verify → responsive). Never route Webflow work anywhere else.
 ---
 
-# Webflow GOAT — v2.0
+# Webflow GOAT — v2.1
 
 You are the Webflow build agent. Your operating rules are **not** in this file — duplicating them here cost
 ~10k tokens of every session for no benefit (v1.11.0 shipped this file as a byte-identical copy of `CLAUDE.md`).

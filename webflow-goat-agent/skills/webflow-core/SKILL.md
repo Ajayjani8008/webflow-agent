@@ -3,7 +3,7 @@ name: webflow-core
 description: The Webflow GOAT operating rules and the fixed build pipeline. Load this before any Webflow build, rebuild or debug lane (T1/T2/T3) and before any MCP write. Owns the native-only ladder, the effect manifest, the evidence rules, the section pipeline and the batching targets. Not needed for micro-edits, audits or questions.
 ---
 
-# Webflow Core — operating rules (v2.0)
+# Webflow Core — operating rules (v2.1)
 
 **Priority: Fidelity (nothing simplified) > Native > Visible in Designer > Responsive-scored > Token economy.**
 Reaching full fidelity first time IS the job. The user must never say "force match", "retry" or "you dropped the animation".
@@ -19,14 +19,16 @@ Every T1 section runs this. Deviating costs turns, and turns are the whole cost.
 | 1 | **Resolve + lock target** | `node "$WF/scripts/wf-resolve.js" --site=<siteId> --page=<pageId> --section=<name>` — derives `<site-id>`, seeds state, locks page + section name, opens a turn budget. Blocks a build against an unlocked or mismatched page (this is what caused a whole section to be built twice on 2026-08-01). |
 | 2 | **Intake → written spec** | `node "$WF/scripts/wf-section.js" intake …` (chains `figma-parse` → `figma-compile` → contract) or the source's intake skill for screenshot/HTML/URL. Output: `specs/<section>.md` + `specs/<section>.contract.json`. |
 | 3 | **Look at the reference** | Open the reference render. **Mandatory, ~1.5k tokens, never skipped.** Then `ref-digest.js` for gradients/blur/overlap/wrap points you cannot see reliably. |
+| 3b | **MEASURE the reference (v2.1)** | `node "$WF/scripts/text-extents.js" contract <ref.png> --bands=<label>:<y0>:<y1>,… --xoff=<N> --out=specs/<section>.extents.json` — turns the render into numbers **before** the build: true ink left/right/width per text line. Those numbers are what the build must hit. Tracking is then **solved**, never derived: `text-extents.js solve --target= --measured= --ls= --gaps=`. Skipping this is what cost the kush-header build four extra publishes (see § F). |
 | 4 | **Preflight the plan** | `node "$WF/scripts/wf-preflight.js" <plan.json>` — validates every type, class, combo, longhand and skeleton BEFORE a single MCP write. Exit 1 = fix the plan, do not build. |
 | 5 | **Build** | SVG upload batch → **ONE** `data_style_tool` batch → **≤2** `data_element_builder` calls (structure + T2 effect children together) → post-batch child-count check. |
-| 6 | **Publish** | Once. |
+| 6 | **Publish** | Once — `wf-resolve.js --publish`. Publishes 1-2 are free; **#3+ is refused without `--cause="<a root cause not already recorded>"`**, and a repeat of a recorded cause is refused outright. If you cannot name a new root cause you are guessing, and a guess does not earn a publish. |
 | 7 | **Verify — one call** | `node "$WF/scripts/verify-section.js" <url> "<sel>" <outDir> --section= --widths=1440,991,767,390 --ref= --audit --states=…` → every breakpoint shot, every score, a11y/perf, states, in ONE consolidated `EVIDENCE` block. Then `dom-contract.js verify` for property equality. |
 | 8 | **Fix** | ONE batched call. Re-check only open items + 3-5 neighbours. |
 | 9 | **Record** | `node "$WF/scripts/wf-section.js" record …` — build_state + registry + spec statuses in one write. |
 
 Re-publish for verification is allowed once (cap 2/section, counted by `wf-resolve`). Publishing per artifact is the process bug.
+**The loop is the cost (v2.1).** `wf-section verify` records verdict+score; a verify that reproduces the previous one closed nothing, and two of those prints **STALLED** — at which point the next step is a *measurement*, never another fix-and-publish. Measured on kush-header: 6 publishes and 4 verify runs against a budget of 15 calls, every one of them because the build targeted spec arithmetic instead of the render.
 **T2:** one section per session. Finish → record → hand off: *"section done and recorded — start the next in a new session, it resumes from build_state."*
 
 **Batching targets (hard):** classes ONE call · elements ≤2 · fix pass ONE per pass · memory ONE write pass. Over target → say why, then continue.
@@ -36,11 +38,13 @@ Re-publish for verification is allowed once (cap 2/section, counted by `wf-resol
 ## B. Rules
 
 **1. RENDER IS GROUND TRUTH — look before building.** JSON and computed values are measurements; the render is the truth. Open the reference and list what values hide: per-character gradients (Figma `styleOverrideTable`), backdrop blur, layered shadows, opacity stacks, overlaps, true wrap points. Verified case: flat JSON reported a per-char gradient H1 as solid white; only the PNG showed it.
+**A global pixel percentage cannot see a small text run.** On kush-header an entire missing line ("OF FRAGRANCES", ~10px tall in a 1632×117 bar) scored **98.75% PASS with zero hot regions** — under the 3% budget and diluted across the 12×12 cell grid. The eye caught it in one view; the differ never would. So: the anchor view stays mandatory, and every text line the section owns gets a `text-extents` band (pixel-verify §1.4). **Δwidth is tracking, Δleft is position** — both are numbers you can fix from.
 **Image cost is ~1,500 tokens, maximum, at any resolution** (Anthropic bills `(w×h)/750` after a 1568px-edge downscale). Earlier pack versions claimed 5k-66k and rationed looking — that was wrong by ~40× and it cost accuracy. Budget: reference render always · one anchor compare against the built shot at the primary width even on PASS · the diff PNG on any FAIL or UNSCORED width. Do not re-open a width that scored PASS — the measurement is stricter than the eye. That is 2-4 views per section, ~6k tokens, and it is the cheapest accuracy in the pack.
 
 **2. EXACT VALUES — never guess.** Every property from the source, applied exactly. A value that exists but is unreadable (broken frame, missing asset, ambiguous binding) → ask. Design judgment the brief simply left open is **not** unknown — decide it at studio quality (Rule 17).
 
-**3. CONVERGE, AND EVIDENCE NOT CLAIM.** pixel-verify after every section; side-by-side visual compare mandatory. Fix passes continue while each pass closes ≥1 diff; stop at zero visual diffs or a documented impossible case. Every score is the tool's own output pasted verbatim (`EVIDENCE verify-section` / `EVIDENCE dom-contract` / `EVIDENCE page-audit` / motion rows). **STALLED is illegal while any CRITICAL/MAJOR diff is open** — that is FAIL: keep working or rebuild. STALLED needs, per remaining diff: property/region, what both passes attempted, why it did not move, the artifact path, what would resolve it.
+**3. CONVERGE, AND EVIDENCE NOT CLAIM.** pixel-verify after every section; side-by-side visual compare mandatory. Fix passes continue while each pass closes ≥1 diff; stop at zero visual diffs or a documented impossible case. Every score is the tool's own output pasted verbatim (`EVIDENCE verify-section` / `EVIDENCE dom-contract` / `EVIDENCE page-audit` / motion rows). **A source's derived numbers lose to the render (v2.1).** kush-header's spec carried per-span letter-spacing of `3.04px`/`13.28px`; applied as px they compute a 192px line where the render measures **111px**. Rule 1 means the render wins — measure the reference, then solve. Equally, a *structural* reading can be wrong: the spec's flex-column brand block sized to its widest child and centred the logo inside it, putting the whole block **+70px right**; the design's model is a logo-width box with the text lines overflowing it centred. Both were visible in the reference at intake and both cost a publish each.
+**STALLED is illegal while any CRITICAL/MAJOR diff is open** — that is FAIL: keep working or rebuild. STALLED needs, per remaining diff: property/region, what both passes attempted, why it did not move, the artifact path, what would resolve it.
 
 **4. NATIVE MODULE FIRST, THEN THE LADDER — descend, never simplify.** Check the native-module map before building any pattern (`build-reference` § Node types): gallery→Lightbox, accordion/menu→Dropdown, video→Video/YouTube, vector anim→Lottie, quote→Blockquote, lists→List, plus slider/tabs/navbar/form/grid. **A div-imitation of an existing native module is a ban-sweep FAIL** — `wf-preflight` blocks it.
 Every effect takes the LOWEST tier that reproduces it exactly: **T1** style tool on a class (incl. `:hover`) → **T2** a real child element (this is how `::before`/`::after`, shapes, glows, gradient borders get built — Webflow has no pseudo-element control) → **T3** native Interactions panel, GSAP-powered, no code, emitted as a `[critical]` ledger build-script → **T4** contained code, eligible ONLY for the enumerated canvas/WebGL set.
@@ -125,3 +129,32 @@ surfacing another site's pending items · writing any code without a written des
 proposing or self-invoking `/custom-code-once` · reusing a past permission · starting from the reference's DOM instead of the native module map.
 
 Run `node "$WF/scripts/wf-lint.js"` after any pack edit. Run `node "$WF/scripts/wf-preflight.js" <plan.json>` before any build.
+
+---
+
+## F. What the kush-header build actually cost (2026-08-01) — read this before the next section
+
+Measured from the transcript, not estimated. Section: one header, one 1920 reference frame, all assets already uploaded.
+
+| | 2026-07-31 (v1.11.0) | 2026-08-01 (v2.0) | v2.1 target |
+|---|---|---|---|
+| assistant turns | 235 | 145 | ≤25 |
+| tool calls | 107 | 68 | ≤15 |
+| context re-read | 72.5M | 48M | — |
+| publishes | 3 | **6** | 2 |
+| wall clock | 51 min | 62 min | ~10 min |
+
+v2.0's instruction split worked (always-injected 11,700 → 958 tokens) and every gate fired correctly: preflight blocked three real blockers before a single MCP write, the page lock caught a section that was recorded as built but absent, the overflow / touch-target / CLS gates all caught real defects. **What v2.0 did not fix is the loop**, and the loop is now the entire remaining cost.
+
+**Where the 6 publishes went — every one avoidable at intake:**
+
+1. build → verify (correct, free)
+2. batched fix: overflow at 4 widths, tablet/mobile layout, 44px touch targets (correct, free)
+3. brand sub-line clipped out of the bar — a flex gap applied between *all* children where the design has 10px above and 0px below
+4. word gap re-derived from the spec instead of measured — made it worse (98.72 → 98.66)
+5. brand block model wrong: a flex column sizes to its widest child and centred the logo inside it, **+70px right**. The design's model is a logo-width box with the text lines overflowing it, centred
+6. letter-spacing finally *solved* from a measured ink width (111px) instead of the spec's arithmetic (192px)
+
+**3, 4, 5 and 6 are one root cause: the build targeted the spec's numbers instead of the render's.** All four were measurable from the reference PNG at intake, with zero Webflow calls and zero publishes. Hence step 3b and the `--cause` gate.
+
+**The other lesson, and it is the expensive one:** at publish 2 the section scored **98.75% PASS, zero hot regions, a11y PASS, and `dom-contract` 158/158 property-equality PASS — with an entire text line missing.** Every automated gate was green. Only the mandatory anchor eye-view caught it. A percentage cannot see a 10px run, and property equality cannot see an element that renders empty. Keep the view; add the band.

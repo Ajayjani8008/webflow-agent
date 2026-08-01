@@ -132,6 +132,33 @@ function verify() {
   }
 
   const pass = v.code === 0 && c.code === 0;
+
+  // Progress ledger (v2.1): a verify that reproduces the previous verdict AND score closed nothing.
+  // Two of those is STALLED — pixel-verify has always said so; this makes it checkable in code.
+  const statePath = path.join(dir, 'build_state.json');
+  const st = readJSON(statePath);
+  if (st) {
+    const sec = (st.sections || []).find(s => s.name === section);
+    if (sec) {
+      const m = v.stdout.match(/match\s+([0-9]+(?:\.[0-9]+)?)%/);
+      const sig = (pass ? 'PASS' : 'FAIL') + '|' + (m ? m[1] : '-') + '|' + (c.code === 0 ? 'CONTRACT-PASS' : 'CONTRACT-FAIL');
+      sec.verify_log = sec.verify_log || [];
+      const prev = sec.verify_log[sec.verify_log.length - 1];
+      sec.verify_log.push(sig);
+      if (sec.verify_log.length > 8) sec.verify_log = sec.verify_log.slice(-8);
+      fs.writeFileSync(statePath, JSON.stringify(st, null, 2));
+      if (!pass && prev === sig) {
+        const same = sec.verify_log.filter(x => x === sig).length;
+        console.log('  ── NO PROGRESS: identical to the previous verify (' + sig + ', seen ' + same + 'x)');
+        if (same >= 2) {
+          console.log('     STALLED. Two consecutive passes closed nothing, so the next step is NOT another');
+          console.log('     fix-and-publish. Measure the delta (text-extents bands / dom-contract / hot');
+          console.log('     regions) and fix from the number, or report the remaining diffs with evidence.');
+        }
+      }
+    }
+  }
+
   console.log('  ── combined verdict: ' + (pass ? 'PASS' : 'FAIL'));
   console.log('     pixels/a11y/states ' + (v.code === 0 ? 'PASS' : 'FAIL') +
     '   property equality ' + (c.skipped ? (c.missing ? 'NO CONTRACT' : 'skipped') : (c.code === 0 ? 'PASS' : 'FAIL')));

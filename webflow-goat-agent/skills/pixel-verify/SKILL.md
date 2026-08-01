@@ -101,6 +101,21 @@ Check vs spec:
 
 Any hit = build void regardless of visual match. Delete, rebuild native, restart verify. **Whitelist (exact match only, never "similar") — every entry needs BOTH a descent proof and a recorded user yes:** ① snippet logged in registry.md `## Custom-Code-Exceptions` via **user-invoked** `/custom-code-once` ② a **T4 effect from the intake manifest** (canvas/WebGL only, per build-reference § Effect Fidelity Ladder T4) whose registry entry carries the `T1/T2/T3 why-not` proof **and the user's verbatim authorization + date**. Instant FAIL: a T4 hit not in the manifest · no registry entry · registry entry without the proof line · registry entry without a recorded permission (agent self-authorized) · permission inherited from another effect, another section or an earlier session · any code carrying layout/spacing/typography/color/hover CSS. "The user said preserve the effects" is context, never permission for a specific snippet.
 
+## 1.4 TEXT-EXTENTS GATE — every text line measured, not eyeballed (v2.1, blocking)
+
+```
+node "$WF/scripts/text-extents.js" bands <ref.png> <built.png> \
+     --bands=<label>:<y0>:<y1>,… [--ref-xoff=N] [--built-xoff=N] [--built-scale=2] [--tol=1.5]
+```
+
+**Why this gate exists, measured on kush-header (2026-08-01):** a missing text line scored **98.75% PASS with zero hot regions**. A ~10px-tall run in a 1632×117 bar cannot move a global percentage and gets diluted across the 12×12 cell grid. The differ is structurally blind to it; so is a spot-check of computed properties, because the *authored* values were all correct — `dom-contract` passed 158/158 while the line was absent.
+
+- Bands come from the intake measurement (`text-extents contract`, webflow-core § A, pipeline step 3b) — the same numbers the build targeted.
+- **BLANK on either side = FAIL.** A clipped or missing run looks exactly like an empty band; that is the point.
+- **Δwidth is tracking, Δleft is position.** Fix tracking with `text-extents solve --target= --measured= --ls= --gaps=` — one measured point closes it, because ink width is linear in letter-spacing. Never re-derive letter-spacing from the source's numbers a second time.
+- Mind DPR: `verify-section` reports CSS px while writing a DPR-2 PNG. Pass `--built-scale=2`, or the band silently answers with the *wrong row* and the numbers still look plausible.
+- Run `ref-integrity.js check` first — it confirms both sides describe the same box and DPR before any of this means anything.
+
 ## 1.5 CONTENT GATE — zero placeholders (deterministic, run every section)
 
 Read every text node + image binding in the built subtree and FAIL on any hit:
@@ -225,7 +240,7 @@ v1.11.0 claimed 5k-66k per PNG and rationed looking on that basis. That figure w
 | A width scored **PASS** (≥97% + height ≤2% + no hot region) | **Do not open the shots.** The measurement is stricter than your eye: it compared every pixel, checked height, and checked per-region concentration. Re-viewing a PASS adds no information and costs context |
 | A width scored **FAIL** | **Open the built shot and the diff PNG** for the named hot regions. That is what the coordinates are for |
 | A width scored **UNSCORED** (no reference frame) | **Open the built shot** — there is no measurement, so your eye is the only gate. Report it as visually-checked-only |
-| Anchor pass, once per section, at the primary width | **Open the built shot side by side with the reference once**, even on PASS. Holistic wrongness that is spatially identical to the reference (right pixels, wrong feel — balance, hierarchy, an image that is technically placed but visually wrong) is the one class the differ cannot see |
+| Anchor pass, once per section, at the primary width | **Open the built shot side by side with the reference once**, even on PASS. Holistic wrongness that is spatially identical to the reference (right pixels, wrong feel — balance, hierarchy, an image that is technically placed but visually wrong) is the one class the differ cannot see. **This row paid for itself on kush-header:** it caught an entirely missing text line behind a 98.75% PASS with zero hot regions and a 158/158 property-equality PASS. v1.11.0 had removed this view to save tokens; it cost ~1.5k and saved a shipped defect |
 | Behaviour states, a11y, content, icons, effects | **Text.** `state-shot`/`motion-verify`/`page-audit` emit measured verdicts; open a state PNG only when its pair scores FAIL |
 
 So: **one reference view + one anchor comparison + images only on failures** = 2-4 views, ~6k tokens. Never skip a view the table asks for; never open one "to be sure" on a width that scored PASS — the measurement compared every pixel, the height and the per-region concentration, and it is stricter than the eye. The cost to control is turns and context, not images.

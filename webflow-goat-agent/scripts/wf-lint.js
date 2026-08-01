@@ -213,7 +213,7 @@ if (exists(REPO)) {
 for (const s of ['shot-el.js', 'state-shot.js', 'motion-verify.js', 'pixel-diff.js', 'ref-extract.js',
   'verify-section.js', 'page-audit.js', 'dom-contract.js', 'ref-integrity.js', 'ref-digest.js',
   'wf-preflight.js', 'skeletons.json', 'figma-parse.js', 'figma-compile.js',
-  'wf-resolve.js', 'wf-section.js']) {
+  'wf-resolve.js', 'wf-section.js', 'text-extents.js']) {
   if (!exists(path.join(MEM, 'scripts', s)) && !exists(path.join(MEM, s))) err('missing-script', `verification script absent: ${s}`, 'scripts');
 }
 

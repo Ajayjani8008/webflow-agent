@@ -122,3 +122,15 @@ inner Block rejects `set_text` ("This element doesn't support text") exactly lik
 and append a Paragraph. Delete the three placeholder links unless the design supplies real items, and
 hide the default Icon with a `display:none` class when the design uses its own chevron asset. Always
 grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.
+
+## 2026-08-01 — kush-header v2.1 (three traps, all cost a publish)
+
+**1. `TextBlock` silently drops `set_text`.** Caught by `wf-preflight` before any MCP write. `TextBlock` is created as a `Block`, which does not own its text node, so it keeps Webflow's own placeholder. Three elements would have shipped as *"This is some text inside of a div block."* — a Rule 14 fail found only after publishing, in the old flow. **Use `Paragraph` (margins zeroed) for a styled text run inside a link/flex parent.**
+
+**2. A source's derived numbers can be wrong; the render cannot.** The spec carried per-span letter-spacing `3.04px` / `13.28px`. Applied as px they compute a 192px line. The reference render measures **111px** ink width (≈5.07-5.22px uniform). Two publishes were spent re-deriving instead of measuring. **Measure text ink extents at intake (`text-extents contract`), then `solve` tracking from one measured point — ink width is linear in letter-spacing.**
+
+**3. A flex column is not the same box as a Figma frame.** The design's brand block is **logo-width** with the name and sub-line overflowing it, centred. Built as a flex column with `align-items:center`, the column sized to its *widest child* (the ~180px sub-line) and centred the 55px logo inside it — moving the whole brand block **+70px right** while every authored property still verified as correct. **When a Figma frame's children are wider than the frame, the frame's width is load-bearing: set it explicitly and let the children overflow.**
+
+**Gate lesson:** at that point the section scored 98.75% PASS / 0 hot regions / a11y PASS / dom-contract 158-of-158 PASS **with a whole text line missing.** A global percentage cannot see a ~10px run in a 1632x117 bar and property equality cannot see an element that renders empty. The anchor eye-view is what caught it; `text-extents bands` (pixel-verify §1.4) is what makes it a number.
+
+**Also confirmed:** `Navbar` remains absent from the `data_element_builder` type enum (`available:false` in skeletons.json) — an API-built header cannot be a real Navbar. `Dropdown` IS available and ships `"Dropdown"` + `"Link 1..3"` placeholders plus an icon-font `Icon`; strip all five per dropdown in the same build pass.

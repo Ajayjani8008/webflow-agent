@@ -2,6 +2,24 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1 — 2026-08-01
+
+The loop, gated. v2.0 cut the static cost (always-injected 11,700 -> 958 tokens) and every gate fired
+correctly on the first real section, but that section still took 6 publishes and 68 calls: the build
+targeted the spec's arithmetic instead of the render's measurements, and nothing stopped another
+publish after each guess. v2.1 adds the missing measurement and the missing brake.
+
+- `text-extents.js` gains `contract` (reference render -> measured ink extents per text line, at
+  INTAKE), `bands` (multi-band ref-vs-built compare, fail-closed, DPR-aware) and `solve` (closes
+  tracking in one step from one measured point — ink width is linear in letter-spacing).
+- Pipeline step 3b: measure the reference before building. pixel-verify §1.4: the text-extents gate.
+- `wf-resolve --publish`: publishes 1-2 free; #3+ refused without `--cause="<new root cause>"`, and a
+  repeat of a recorded cause refused outright. `--force` is gone — a guess does not earn a publish.
+- `wf-section verify`: records verdict+score; a verify reproducing the previous one prints NO PROGRESS,
+  two prints STALLED, where the next step is a measurement and never another fix-and-publish.
+- Recorded why: a missing text line scored 98.75% PASS / 0 hot regions / dom-contract 158-of-158 PASS.
+  A percentage cannot see a 10px run; property equality cannot see an element that renders empty.
+
 ## v2.0 — 2026-08-01
 Cost re-architected on measured evidence, gates unchanged or stronger. Full evidence: `v2-rationale.md` (same dir).
 

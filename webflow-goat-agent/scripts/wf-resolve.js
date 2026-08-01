@@ -13,8 +13,11 @@
 // Usage:
 //   node wf-resolve.js --site-id=<webflow site_id> [--slug=<shortName>] [--name=<display name>]
 //                      [--page=<pageId>] [--page-name=<name>] [--branch=<branch>]
-//                      [--section=<name>] [--switch-page] [--json]
-//   node wf-resolve.js --site-id=… --section=… --publish [--force]     # count a publish, enforce cap 2
+//                      [--section=<name>] [--switch-page] [--reset-publishes] [--json]
+//   node wf-resolve.js --site-id=… --section=… --publish [--cause="<new root cause>"]
+//        Publishes 1-2 are free. Publish 3+ requires --cause carrying a root cause not already
+//        recorded: the same cause twice means the previous fix was a guess, and a guess does not
+//        earn a publish. This is the anti-loop gate.
 //   node wf-resolve.js --site-id=… --section=… --turns=N --calls=M     # budget checkpoint
 //   node wf-resolve.js --self-test
 //
@@ -130,17 +133,44 @@ function run() {
     note('spec: ' + (fs.existsSync(specFile) ? 'present' : 'NOT WRITTEN YET — write it at intake (step 2)'));
   }
 
+  // ── PUBLISH COUNTER RESET (a rebuild is a new build cycle, not a continuation) ──────────────
+  if (flag('reset-publishes')) {
+    if (!sec) { console.error('--reset-publishes needs --section=<name>'); process.exit(2); }
+    note('publishes reset ' + (sec.publishes || 0) + ' -> 0 (rebuild starts a fresh cycle)');
+    sec.publishes = 0;
+  }
+
   // ── PUBLISH CAP ──────────────────────────────────────────────────────────────────────────────
   if (flag('publish')) {
     if (!sec) { console.error('--publish needs --section=<name>'); process.exit(2); }
     const n = (sec.publishes || 0) + 1;
-    if (n > PUBLISH_CAP && !flag('force')) {
+    sec.publish_causes = sec.publish_causes || [];
+    const cause = (opt('cause') || '').trim();
+    const norm = t => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const repeat = cause && sec.publish_causes.some(c => norm(c) === norm(cause));
+
+    if (n <= PUBLISH_CAP) {
+      sec.publishes = n;
+      if (cause) sec.publish_causes.push(cause);
+      note('publishes: ' + n + '/' + PUBLISH_CAP);
+    } else if (!cause) {
       block('PUBLISH CAP: this would be publish #' + n + ' for "' + section + '" (cap ' + PUBLISH_CAP + ').' +
-        '\n  A 3rd publish means something is being fixed blind. Read the actual state first, then --force if it is genuinely needed.');
+        '\n  Publishes 1-2 cover the build plus its one verification re-publish. #' + n + ' means a defect' +
+        '\n  was found AFTER that pass, so name it: --cause="<the root cause you just identified>".' +
+        '\n  Recorded so far:' + (sec.publish_causes.length ? sec.publish_causes.map((c, i) => '\n    ' + (i + 1) + '. ' + c).join('') : ' (none)') +
+        '\n  If you cannot state a NEW root cause you are guessing — measure instead of publishing.');
+    } else if (repeat) {
+      block('PUBLISH REFUSED: that cause is already recorded for "' + section + '" — ' + JSON.stringify(cause) +
+        '\n  The same root cause twice means the previous fix did not address it. That IS the' +
+        '\n  build/check/build/check loop, and it is what turns one section into six publishes.' +
+        '\n  Measure the actual delta (text-extents bands / dom-contract / pixel-diff hot regions)' +
+        '\n  and fix from the number, or record a genuinely different cause.');
     } else {
       sec.publishes = n;
-      if (n > PUBLISH_CAP) warn('publish #' + n + ' forced past the cap — state why in the report');
-      note('publishes: ' + n + '/' + PUBLISH_CAP);
+      sec.publish_causes.push(cause);
+      warn('publish #' + n + ' past the cap, admitted on a new root cause: ' + cause +
+        '\n  Every publish past 2 belongs in the section report, verbatim.');
+      note('publishes: ' + n + '/' + PUBLISH_CAP + ' (causes recorded: ' + sec.publish_causes.length + ')');
     }
   }
 
@@ -202,10 +232,12 @@ if (flag('self-test')) {
   ok &= runCli(['--site-id=S1', '--page=P1', '--section=hero'], 0);                            // resume by site_id, no slug
   ok &= runCli(['--site-id=S1', '--page=P2', '--section=hero'], 1);                            // page mismatch blocks
   ok &= runCli(['--site-id=S1', '--page=P2', '--section=hero', '--switch-page'], 0);           // explicit switch allowed
-  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 0);                            // publish 1
-  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 0);                            // publish 2
-  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 1);                            // publish 3 blocked
-  ok &= runCli(['--site-id=S1', '--section=hero', '--publish', '--force'], 0);                 // forced
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 0);                            // publish 1 free
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 0);                            // publish 2 free
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish'], 1);                            // #3 with no cause: blocked
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish', '--cause=brand sub-line clipped outside the bar'], 0);   // #3 on a NEW cause
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish', '--cause=Brand  SUB-LINE   clipped, outside the bar!'], 1); // same cause reworded: refused
+  ok &= runCli(['--site-id=S1', '--section=hero', '--publish', '--cause=letter-spacing solved from measured ink width'], 0); // #4 genuinely new
   ok &= runCli(['--site-id=S9'], 1);                                                           // unknown site, no slug
   // near-miss section name must warn, not silently create a second artefact set
   let nearOut = '';
@@ -215,8 +247,12 @@ if (flag('self-test')) {
   ok &= nearOk;
 
   const st = readJSON(path.join(sites, 'demo-site', 'build_state.json'));
-  const pubOk = st.sections[0].publishes === 3;
-  console.log((pubOk ? 'PASS' : 'FAIL') + '  publish counter persisted = ' + st.sections[0].publishes);
+  const pubOk = st.sections[0].publishes === 4;
+  console.log((pubOk ? 'PASS' : 'FAIL') + '  publish counter persisted = ' + st.sections[0].publishes + ' (want 4)');
+  const causes = st.sections[0].publish_causes || [];
+  const causeOk = causes.length === 2;
+  console.log((causeOk ? 'PASS' : 'FAIL') + '  distinct root causes recorded = ' + causes.length + ' (want 2 — the reworded repeat must not count)');
+  ok = ok && causeOk;
   console.log((st.page.page_id === 'P2' ? 'PASS' : 'FAIL') + '  page lock persisted = ' + st.page.page_id);
   fs.rmSync(tmp, { recursive: true, force: true });
   process.exit(ok && pubOk ? 0 : 1);
