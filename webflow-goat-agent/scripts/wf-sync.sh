@@ -24,14 +24,17 @@ APPLY=0; [[ "${1:-}" == "--apply" ]] && APPLY=1
 
 SKILLS=(build-reference cms-build component-build custom-code-once design-intake figma-setup
         html-intake motion-build pixel-verify portable-mode responsive-pass session-recovery
-        url-intake webflow-help webflow-platform)
+        url-intake webflow-core webflow-help webflow-platform)
 
 # live path <TAB> repo path — a TAB separator, because a Windows repo path
 # contains a drive-letter colon and ${pair##*:} would eat it.
 TAB=$'	'
 PAIRS=(
   "$LIVE/agents/webflow/webflow-goat.md$TAB$REPO/agents/webflow-goat.md"
-  "$LIVE/rules/webflow/core.md$TAB$REPO/rules/webflow-core.md"
+  "$HOME/CLAUDE.md$TAB$REPO/CLAUDE.md"
+  "$LIVE/rules/common/agents.md$TAB$REPO/rules/common-agents.md"
+  "$MEM/CHANGELOG.md$TAB$REPO/CHANGELOG.md"
+  "$MEM/v2-rationale.md$TAB$REPO/docs-memory/v2-rationale.md"
   "$MEM/error_learnings.md$TAB$REPO/docs-memory/error_learnings.md"
   "$MEM/impossible_cases.md$TAB$REPO/docs-memory/impossible_cases.md"
   "$MEM/how-to-use.md$TAB$REPO/how-to-use.md"

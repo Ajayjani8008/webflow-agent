@@ -1,3 +1,14 @@
+# Webflow GOAT — CHANGELOG
+
+Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
+
+## v2.0 — 2026-08-01
+Cost re-architected on measured evidence, gates unchanged or stronger. Full evidence: `v2-rationale.md` (same dir).
+
+---
+
+## Pre-v2.0 (verbatim, from rules/webflow/core.md)
+
 # Webflow Routing (v1.11.0 — GOAT agent system)
 
 ALL Webflow work — any size, any source (Figma / screenshot / HTML / live URL / description) — is handled by the **webflow-goat** agent (`~/.claude/agents/webflow/webflow-goat.md`) or done inline following its rules. It works end-to-end inline: intake → build → pixel-verify → responsive-pass.

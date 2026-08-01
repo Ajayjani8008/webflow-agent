@@ -29,13 +29,18 @@ const REPO = (() => {
   return candidates.find((p) => fs.existsSync(p)) || candidates[0];
 })();
 const AGENT = path.join(PACK, 'agents/webflow/webflow-goat.md');
-const RULES = path.join(PACK, 'rules/webflow/core.md');
+const ROUTER = path.join(HOME, 'CLAUDE.md');          // v2.0: always-injected router (was rules/webflow/core.md)
 const SKILLS_DIR = path.join(PACK, 'skills');
 
-// the 15 webflow skills the agent owns (respira/divi share the dir but belong to another pack)
+// the 16 webflow skills the agent owns (respira/divi share the dir but belong to another pack)
 const WF_SKILLS = ['build-reference', 'cms-build', 'component-build', 'custom-code-once', 'design-intake',
   'figma-setup', 'html-intake', 'motion-build', 'pixel-verify', 'portable-mode', 'responsive-pass',
-  'session-recovery', 'url-intake', 'webflow-help', 'webflow-platform'];
+  'session-recovery', 'url-intake', 'webflow-core', 'webflow-help', 'webflow-platform'];
+
+// v2.0 context budgets. These are the whole point of the release: cost is turns x context, and the
+// router + agent file are re-read on every single turn of every session, build or not.
+const ROUTER_MAX_BYTES = 6000;    // ~1.5k tokens
+const AGENT_MAX_BYTES = 4000;     // ~1k tokens — it is a pointer, not a rulebook
 
 // per-site state files: valid if the template carries them (sites/<id>/ copies are made per build)
 const PER_SITE = ['registry.md', 'build_state.json', 'pending_designer_work.md'];
@@ -52,8 +57,29 @@ const exists = p => fs.existsSync(p);
 const files = [];
 if (exists(AGENT)) files.push({ id: 'agent', path: AGENT, text: read(AGENT) });
 else err('missing-file', 'agent file not found', AGENT);
-if (exists(RULES)) files.push({ id: 'rules', path: RULES, text: read(RULES) });
-else err('missing-file', 'routing rules not found', RULES);
+if (exists(ROUTER)) files.push({ id: 'router', path: ROUTER, text: read(ROUTER) });
+else err('missing-file', 'router CLAUDE.md not found', ROUTER);
+
+// ---------- 0. v2.0 context budget + the duplication that caused it -------------------------
+// v1.11.0 shipped webflow-goat.md as a byte-identical copy of CLAUDE.md (38,398 vs 38,811 bytes,
+// differing only in frontmatter) — ~10k tokens of the same rules injected twice into every session.
+// Nothing in the pack could notice. This can.
+if (exists(AGENT) && exists(ROUTER)) {
+  const a = read(AGENT), r = read(ROUTER);
+  const strip = s => s.replace(/^---[\s\S]*?\n---\n/, '').replace(/\s+/g, ' ').trim();
+  const sa = strip(a), sr = strip(r);
+  if (sa === sr) err('agent-duplicates-router', 'webflow-goat.md is a byte-identical copy of CLAUDE.md — the same rules are injected twice per session', AGENT);
+  else {
+    // catch near-duplicates too: how much of the router's text is verbatim inside the agent file
+    const chunks = sr.split(/(?<=\.)\s+/).filter(s => s.length > 60);
+    const shared = chunks.filter(c => sa.includes(c)).length;
+    if (chunks.length && shared / chunks.length > 0.4) {
+      err('agent-duplicates-router', `webflow-goat.md repeats ${Math.round(shared / chunks.length * 100)}% of CLAUDE.md verbatim — the agent file is a pointer, the rules live in the webflow-core skill`, AGENT);
+    }
+  }
+  if (Buffer.byteLength(r) > ROUTER_MAX_BYTES) err('router-too-large', `CLAUDE.md is ${Buffer.byteLength(r)} bytes (budget ${ROUTER_MAX_BYTES}) — it is injected into EVERY session including micro-edits and questions. Rules belong in the webflow-core skill.`, ROUTER);
+  if (Buffer.byteLength(a) > AGENT_MAX_BYTES) err('agent-too-large', `webflow-goat.md is ${Buffer.byteLength(a)} bytes (budget ${AGENT_MAX_BYTES}) — it should point at webflow-core, not restate it.`, AGENT);
+}
 for (const s of WF_SKILLS) {
   const p = path.join(SKILLS_DIR, s, 'SKILL.md');
   if (exists(p)) files.push({ id: s, path: p, text: read(p) });
@@ -174,7 +200,7 @@ for (const name of agentText.match(/`([a-z][a-z-]{3,})`/g) || []) {
 }
 
 // ---------- 5. live ↔ repo parity ----------
-const pairs = [[AGENT, path.join(REPO, 'agents/webflow-goat.md')], [RULES, path.join(REPO, 'rules/webflow-core.md')]];
+const pairs = [[AGENT, path.join(REPO, 'agents/webflow-goat.md')], [ROUTER, path.join(REPO, 'CLAUDE.md')]];
 for (const s of WF_SKILLS) pairs.push([path.join(SKILLS_DIR, s, 'SKILL.md'), path.join(REPO, 'skills', s, 'SKILL.md')]);
 if (exists(REPO)) {
   for (const [live, repo] of pairs) {
@@ -186,7 +212,8 @@ if (exists(REPO)) {
 // ---------- 6. verification scripts present ----------
 for (const s of ['shot-el.js', 'state-shot.js', 'motion-verify.js', 'pixel-diff.js', 'ref-extract.js',
   'verify-section.js', 'page-audit.js', 'dom-contract.js', 'ref-integrity.js', 'ref-digest.js',
-  'wf-preflight.js', 'skeletons.json', 'figma-parse.js', 'figma-compile.js']) {
+  'wf-preflight.js', 'skeletons.json', 'figma-parse.js', 'figma-compile.js',
+  'wf-resolve.js', 'wf-section.js']) {
   if (!exists(path.join(MEM, 'scripts', s)) && !exists(path.join(MEM, s))) err('missing-script', `verification script absent: ${s}`, 'scripts');
 }
 

@@ -53,6 +53,30 @@ const VALID_TYPES = new Set(['Container', 'Section', 'DivBlock', 'Heading', 'Tex
   'FormSelect', 'FormFileUploadWrapper', 'FormButton', 'Tabs', 'Slider', 'CMSCollection', 'PageSlot',
   'ComponentSlot', 'Dropdown', 'DOM', 'BY_CUSTOM_TAG']);
 
+// ── v2.0 ban-sweep constants: the Never-list clauses a machine can decide ──────────────────────
+// Every entry below used to be a sentence the agent had to remember at turn 200 under a 500k
+// context. A sentence forgets; a regex does not.
+const PLACEHOLDER_RE = new RegExp([
+  'lorem ipsum', 'this is some text inside of a div block', '^text$', '^heading$', '^button$',
+  '^paragraph$', '^title$', '^subtitle$', '^label$', '^link$', '^click here$', '^learn more later$',
+  'placeholder', '^tab (one|two|three)$', '^slide \\d+$', '^item \\d+$', '^your (text|heading) here$',
+  '^insert', 'sample text', '^tbd$', '^todo$', '^xxx+$', '^\\.{3,}$', '^dummy',
+].join('|'), 'i');
+const CODE_TYPES = new Set(['HtmlEmbed', 'CodeBlock', 'DOM']);
+const XATTR_OK = /^(id|href|target|rel|alt|title|type|name|value|placeholder|role|tabindex|lang|dir|loading|decoding|src|srcset|sizes|width|height|for|action|method|autocomplete|required|disabled|checked|selected|multiple|maxlength|min|max|step|pattern|aria-[\w-]+|data-[\w-]+)$/i;
+const IMITABLE_TYPES = new Set(['DivBlock', 'Container', 'Section', 'LinkBlock']);
+const IMITATION_RE = {
+  Slider: /\b[\w-]*(slider|carousel|slideshow)[\w-]*\b/,
+  Tabs: /\b[\w-]*(tabs?[-_]?(nav|menu|pane|link|content)|tabpanel)[\w-]*\b/,
+  Dropdown: /\b[\w-]*(dropdown|accordion|disclosure)[\w-]*\b/,
+  Navbar: /\b[\w-]*(navbar|nav[-_]?bar)[\w-]*\b/,
+  Lightbox: /\b[\w-]*(lightbox|gallery[-_]?modal)[\w-]*\b/,
+  Form: /\b[\w-]*(form[-_]?(wrapper|block))[\w-]*\b/,
+};
+// intrinsic UI keeps bare px widths; everything else is fluid-first (Rule 7)
+const INTRINSIC_RE = /(icon|avatar|logo|badge|dot|bullet|chevron|arrow|thumb|swatch|divider|rule|spinner|check)/i;
+const BEM_RE = /^[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$/;
+
 function check(plan) {
   const blockers = [], warnings = [];
   const B = (kind, where, msg, fix) => blockers.push({ kind, where, msg, fix });
@@ -145,10 +169,84 @@ function check(plan) {
           'create the class before applying it, or the element is created unstyled (a partial_success that is easy to misread as total failure)');
       }
     }
+    // ---- v2.0 ban-sweep: the Never-list clauses a machine can decide ----------------------
+    // Rule 14 — placeholder / invented copy never ships.
+    if (typeof node.setText === 'string' && PLACEHOLDER_RE.test(node.setText.trim())) {
+      B('placeholder-copy', where, `setText is placeholder copy: ${JSON.stringify(node.setText.slice(0, 60))}`,
+        'use the verbatim string from the source. Rule 14 is a hard gate — pixel-verify §1.5 fails the section on any survivor');
+    }
+    // Rule 4 — code is never the agent's call.
+    if (CODE_TYPES.has(t) && !node.authorization) {
+      B('code-without-authorization', where,
+        `${t} is a code element with no "authorization" field — code needs a written T1/T2/T3 descent proof AND an explicit per-effect user yes`,
+        'descend the ladder first (T1 class style -> T2 real child element -> T3 native Interactions). If the effect is genuinely in the T4 canvas/WebGL set, ask the user in one line and record their exact words as authorization:"<quote> (YYYY-MM-DD)"');
+    }
+    // Rule 4 — no CSS through attributes; xattr is HTML semantics only.
+    for (const a of (node.xattr || node.attributes || [])) {
+      const an = (a && (a.name || a.key) || '').toLowerCase();
+      if (an === 'style') B('style-attribute', where, 'inline style attribute', 'every CSS value goes through data_style_tool on a class');
+      else if (an && !XATTR_OK.test(an)) W('xattr-suspect', where, `xattr "${an}" is not a known HTML semantic attribute`,
+        'xattr is for id/href/alt/type/placeholder/role/aria-*/data-*/CMS bindings only — CSS there is void');
+    }
+    // Rule 4 — a div-imitation of a module the platform already ships.
+    if (IMITABLE_TYPES.has(t)) {
+      const names = (node.styleNames || []).join(' ').toLowerCase();
+      for (const [native, re] of Object.entries(IMITATION_RE)) {
+        if (re.test(names)) {
+          B('div-imitation', where, `class names (${names.trim()}) describe a ${native}, but this is a ${t}`,
+            `build the native ${native} element. A div-imitation of an existing native module is a ban-sweep FAIL — if the native one genuinely cannot be created via MCP, log it to impossible_cases.md and say so in the report`);
+          break;
+        }
+      }
+    }
+    // Rule 15 — an icon in a flex row without flex-shrink:0 collapses to 0 wide.
+    if (t === 'Image') {
+      const own = (node.styleNames || []).map(n => byName.get(n)).filter(Boolean);
+      const props = Object.assign({}, ...own.map(c => c.properties || {}));
+      const parentFlex = ancestors.length && flexParents.has(ancestors[ancestors.length - 1] + '|' + pathStr);
+      if (parentFlex && String(props['flex-shrink']) !== '0') {
+        B('icon-no-flex-shrink', where, 'Image inside a flex row without flex-shrink:0 — this is how icons ship at 0 wide',
+          'add flex-shrink:0 plus an explicit width and height to the icon class, then verify the rendered box is non-zero at every breakpoint');
+      }
+    }
+
     const kids = node.children || [];
+    // remember which children sit inside a flex parent, for the icon check above
+    const selfProps = Object.assign({}, ...(node.styleNames || []).map(n => (byName.get(n) || {}).properties || {}));
+    if (/^(flex|inline-flex)$/.test(String(selfProps.display || ''))) {
+      kids.forEach((k, i) => flexParents.add(t + '|' + `${pathStr}${t}[${i}].`));
+    }
     kids.forEach((k, i) => walk(k, `${pathStr}${t}[${i}].`, ancestors.concat(t === 'Form' ? ['Form', 'FormWrapper'] : [t])));
   };
+  const flexParents = new Set();
   if (plan.tree) walk(plan.tree, '', []);
+
+  // ---------- class-level ban sweep (v2.0) ----------
+  const seen = new Set();
+  for (const c of classes) {
+    if (seen.has(c.name)) B('duplicate-class', `class ${c.name}`, 'declared twice in this plan',
+      'one declaration per class — duplicates create a second global class and split the styling');
+    seen.add(c.name);
+
+    const p = c.properties || {};
+    // Rule 7 — fluid base first. A bare px width on a layout class is a Figma canvas artifact.
+    const w = String(p.width || '');
+    // a small square (width == height, <=64px) is intrinsic UI whatever it is called
+    const sq = w && String(p.height || '') === w && parseFloat(w) <= 64;
+    if (/^\d+(\.\d+)?px$/.test(w) && !INTRINSIC_RE.test(c.name) && !sq && !p['max-width']) {
+      W('bare-px-width', `class ${c.name}`, `width:${w} with no max-width — Figma fixed widths are canvas artifacts, not responsive intent`,
+        'use width:100% + max-width:' + w + '. Bare px belongs only on intrinsic UI (icon, avatar, logo, fixed media)');
+    }
+    // partial radius is legal but usually a transcription slip
+    const corners = ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius', 'border-bottom-right-radius'];
+    const have = corners.filter(k => p[k] !== undefined);
+    if (have.length && have.length < 4) {
+      W('partial-radius', `class ${c.name}`, `only ${have.length}/4 radius corners set`,
+        'set all four longhands unless the design really has asymmetric corners — a missing corner is the most common shorthand-expansion slip');
+    }
+    if (!BEM_RE.test(c.name)) W('class-naming', `class ${c.name}`, 'not BEM kebab-case',
+      'block, block__element, block__element--modifier — keeps the registry dedupable');
+  }
 
   return { section: plan.section || null, blockers, warnings };
 }
@@ -188,10 +286,56 @@ if (SELFTEST) {
   const missing = want.filter(k => !kinds.includes(k));
   const selectInForm = r.blockers.filter(b => b.kind === 'invalid-placement').length;
   report(r);
+
+  // ---- v2.0 ban-sweep cases ----
+  const ban = {
+    section: 'ban-sweep',
+    classes: [
+      { name: 'hero', properties: { color: '#111' } },
+      { name: 'hero', properties: { color: '#000' } },                                  // duplicate-class
+      { name: 'hero__row', properties: { display: 'flex' } },                           // flex parent
+      { name: 'hero__icon', properties: { width: '24px', height: '24px' } },            // icon, no flex-shrink
+      { name: 'hero__card', properties: { width: '480px' } },                           // bare-px-width
+      { name: 'hero__box', properties: { 'border-top-left-radius': '8px' } },           // partial-radius
+      { name: 'Hero_Box', properties: { color: '#111' } },                              // class-naming
+      { name: 'hero__slider-track', properties: {} },
+    ],
+    tree: {
+      type: 'Section', styleNames: ['hero'], children: [
+        { type: 'Paragraph', setText: 'Lorem ipsum dolor sit amet' },                   // placeholder-copy
+        { type: 'Paragraph', setText: 'This is some text inside of a div block.' },     // placeholder-copy
+        { type: 'Paragraph', setText: 'Experience premium perfumes from Dubai.' },      // real copy, must NOT fire
+        { type: 'HtmlEmbed' },                                                          // code-without-authorization
+        { type: 'HtmlEmbed', authorization: 'user said yes 2026-08-01' },               // authorized, must NOT fire
+        { type: 'DivBlock', styleNames: ['hero__row'], children: [
+          { type: 'Image', styleNames: ['hero__icon'] },                                // icon-no-flex-shrink
+        ] },
+        { type: 'DivBlock', styleNames: ['hero__slider-track'] },                       // div-imitation (Slider)
+        { type: 'DivBlock', xattr: [{ name: 'style', value: 'color:red' }] },           // style-attribute
+        { type: 'DivBlock', xattr: [{ name: 'aria-label', value: 'ok' }] },             // must NOT fire
+      ]
+    }
+  };
+  const r2 = check(ban);
+  const k2 = r2.blockers.map(b => b.kind), w2 = r2.warnings.map(x => x.kind);
+  const cases = [
+    ['placeholder-copy fires twice, real copy clean', k2.filter(k => k === 'placeholder-copy').length === 2],
+    ['code-without-authorization fires once only', k2.filter(k => k === 'code-without-authorization').length === 1],
+    ['div-imitation caught by class name', k2.includes('div-imitation')],
+    ['icon in flex row without flex-shrink blocked', k2.includes('icon-no-flex-shrink')],
+    ['inline style attribute blocked', k2.includes('style-attribute')],
+    ['aria-* attribute not flagged', !w2.includes('xattr-suspect')],
+    ['duplicate class blocked', k2.includes('duplicate-class')],
+    ['bare px width warned', w2.includes('bare-px-width')],
+    ['partial radius warned', w2.includes('partial-radius')],
+    ['non-BEM name warned', w2.includes('class-naming')],
+  ];
   console.log('\nself-test:');
   console.log('  expected blocker kinds present: ' + (missing.length ? 'MISSING ' + missing.join(',') : 'all ' + want.join(', ')));
   console.log('  FormSelect flagged once (outside Form) and NOT flagged inside Form: ' + (selectInForm === 1 ? 'ok' : 'FAIL (' + selectInForm + ')'));
-  process.exit(missing.length === 0 && selectInForm === 1 ? 0 : 1);
+  let banOk = true;
+  for (const [name, ok] of cases) { console.log('  ' + (ok ? 'ok  ' : 'FAIL') + '  ' + name); banOk = banOk && ok; }
+  process.exit(missing.length === 0 && selectInForm === 1 && banOk ? 0 : 1);
 }
 
 const file = argv.filter(a => !a.startsWith('--'))[0];

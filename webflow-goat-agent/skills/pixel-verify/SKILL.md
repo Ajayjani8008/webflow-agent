@@ -213,9 +213,11 @@ Any one of the three failing = FAIL → read the named regions → fix pass. Sco
 
 **EVIDENCE RULE — the score is the tool's output, never your sentence.** The `EVIDENCE pixel-diff` block is pasted verbatim into the report (§5). A report carrying a number without the block is not a passed gate, it is an unverified claim; the same applies to `page-audit`, `state-shot` and `motion-verify` output. Regression suite for the gate itself: `node "$WF/scripts/pixel-diff.test.js"` (5 cases, must stay green after any change to the differ).
 
-**IMAGE DISCIPLINE — measurement replaces eyeballing (v1.11.0, recalibrated).** Opening a PNG costs **5k-66k tokens** (measured: 66,328 / 1920x900 - 46,314 / 355x323 - 14,603 / 1920x117), not the ~1-2k this skill claimed until v1.11.0 - a 20-60x error, and it stays in context for the rest of the session so it is paid again on every later call. Six views in one session = 229,373 tokens = 73% of a two-section build.
+**IMAGE DISCIPLINE — corrected in v2.0 on measured evidence.** An image block costs **~1,500 tokens maximum, at any resolution**: Anthropic bills `(width × height) / 750` after downscaling the long edge to 1568px, so a 3840×1800 render and a 1920×900 render both land at ~1,536 tokens. Verified against the 2026-07-31 transcript: six image views totalled 917,364 base64 chars ≈ **9k tokens for all six**.
 
-**Budget: ONE image view per section, maximum.** Everything the eye was doing is now measured: `ref-digest.js` answers Rule 1 (gradients, blur/shadow, overlaps, wrap points) and `dom-contract.js` proves every property. Spend the one view only when digest and measurement disagree, or on a FAIL whose hot regions do not localise the cause. The rule is no longer "look where looking adds information" - it is **measure first, and look only when measurement is exhausted**:
+v1.11.0 claimed 5k-66k per PNG and rationed looking on that basis. That figure was **wrong by ~40×** — it was context growth measured around image calls, misattributed to the images. The real driver is turns × context size (that session: 538 turns, 172M cache-read, images 0.005% of it). Rationing the reference view cost accuracy and saved nothing, so it is reversed here.
+
+**Budget: 2-4 views per section (~6k tokens) — the cheapest accuracy in the pack.** Look where the table below says look. `ref-digest.js` still runs, but as a *supplement* to the eye for what the eye reads unreliably (exact gradient ramps, blur radii, sub-pixel overlaps), never as a replacement for Rule 1.
 
 | Situation | Do |
 |---|---|
@@ -226,7 +228,7 @@ Any one of the three failing = FAIL → read the named regions → fix pass. Sco
 | Anchor pass, once per section, at the primary width | **Open the built shot side by side with the reference once**, even on PASS. Holistic wrongness that is spatially identical to the reference (right pixels, wrong feel — balance, hierarchy, an image that is technically placed but visually wrong) is the one class the differ cannot see |
 | Behaviour states, a11y, content, icons, effects | **Text.** `state-shot`/`motion-verify`/`page-audit` emit measured verdicts; open a state PNG only when its pair scores FAIL |
 
-So: **one reference view + one anchor comparison + images only on failures.** That is 2-4 image views per section instead of 10-20, with a stronger evidence chain than before — because every unopened image was replaced by a measurement, never by an assumption. Never skip an image because of budget when the row above says open it; never open one "to be sure" when it scored PASS.
+So: **one reference view + one anchor comparison + images only on failures** = 2-4 views, ~6k tokens. Never skip a view the table asks for; never open one "to be sure" on a width that scored PASS — the measurement compared every pixel, the height and the per-region concentration, and it is stricter than the eye. The cost to control is turns and context, not images.
 
 **Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good."
 

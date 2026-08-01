@@ -7,7 +7,7 @@
 | Divi/Respira/WordPress + Divi | Divi | `rules/divi/*` → divi-orchestrator |
 
 ## Intent shortcuts (auto-route, no asking)
-Figma URL → platform's design pipeline. Screenshot of a design → screenshot pipeline. `bug::`/`issue::` → systematic-debugger (Divi) / webflow-goat handles its own debugging (Webflow). Site name mentioned → find + activate site (MCP sites tool or REST). (Webflow: everything via webflow-goat — see rules/webflow/core.md.)
+Figma URL → platform's design pipeline. Screenshot of a design → screenshot pipeline. `bug::`/`issue::` → systematic-debugger (Divi) / webflow-goat handles its own debugging (Webflow). Site name mentioned → find + activate site (MCP sites tool or REST). (Webflow: everything via webflow-goat — routing lives in `~/CLAUDE.md`, rules in the `webflow-core` skill.)
 
 ## Universal principles
 - Complexity-scaled workflow: small tasks execute immediately, no agents, no planning. Full pipelines only for large work.
