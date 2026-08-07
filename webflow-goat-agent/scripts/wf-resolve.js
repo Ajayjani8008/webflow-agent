@@ -39,6 +39,24 @@ const argv = process.argv.slice(2);
 const flag = n => argv.includes('--' + n);
 const opt = n => { const p = '--' + n + '='; const a = argv.find(x => x.startsWith(p)); return a ? a.slice(p.length) : null; };
 
+// Fail closed on an unknown flag. This script takes --site-id=<webflow id> while wf-section.js takes
+// --site=<state dir>, so passing the wrong one is a near-inevitable slip — and silently ignoring it
+// seeded a state dir with site_id:"" and printed "site_id -", which is exactly the split-state bug
+// v1.9.1 exists to prevent. A lock nobody can match on later is worse than no lock.
+const KNOWN_FLAGS = ['site-id', 'slug', 'name', 'page', 'page-name', 'branch', 'section', 'calls',
+  'cause', 'json', 'publish', 'reset-publishes', 'self-test', 'switch-page'];
+for (const a of argv) {
+  if (!a.startsWith('--')) continue;
+  const n = a.slice(2).split('=')[0];
+  if (KNOWN_FLAGS.includes(n)) continue;
+  const hint = n === 'site'
+    ? '\n  --site is wf-section.js\'s flag (the state DIR). Here the Webflow id goes in --site-id=<24-hex>.'
+    : '';
+  console.error('BLOCKED: unknown flag --' + n + hint +
+    '\n  known: ' + KNOWN_FLAGS.map(k => '--' + k).join(' '));
+  process.exit(2);
+}
+
 const out = { ok: true, blockers: [], warnings: [], notes: [] };
 const block = m => { out.ok = false; out.blockers.push(m); };
 const warn = m => out.warnings.push(m);
@@ -228,6 +246,8 @@ if (flag('self-test')) {
     return pass;
   };
   let ok = true;
+  ok &= runCli(['--site=S1', '--slug=demo-site', '--page=P1', '--section=hero'], 2);          // wf-section's --site: blocked, not silently ignored
+  ok &= runCli(['--sight-id=S1', '--slug=demo-site', '--section=hero'], 2);                   // any typo'd flag: blocked
   ok &= runCli(['--site-id=S1', '--slug=demo-site', '--page=P1', '--section=hero'], 0);       // seed + lock
   ok &= runCli(['--site-id=S1', '--page=P1', '--section=hero'], 0);                            // resume by site_id, no slug
   ok &= runCli(['--site-id=S1', '--page=P2', '--section=hero'], 1);                            // page mismatch blocks

@@ -2,6 +2,20 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.3 — 2026-08-07
+
+Found by running the pipeline on a real section, not by reading it: `wf-resolve.js` accepted an unknown
+flag silently and locked a site with no id.
+
+- `wf-resolve.js` documents `--site-id=<webflow id>`; `wf-section.js` uses `--site=<state dir>`. Passing
+  the wrong one is a near-inevitable slip, and the script ignored it, fell back to slug matching, wrote
+  `site.site_id: ""` and printed `site_id -` next to an otherwise green `EVIDENCE ... OK`. A later session
+  matching on `build_state.site.site_id` finds nothing and seeds a SECOND dir for the same site — the exact
+  split-state bug v1.9.1 was written to prevent, reintroduced through the front door.
+- Now fail-closed: any unrecognised `--flag` exits 2 with the known-flag list, and `--site` gets a targeted
+  hint naming the collision. Two self-test cases cover it (wrong-tool flag, typo'd flag): 17 checks green.
+- No gate, threshold or check changed.
+
 ## v2.1.2 — 2026-08-07
 
 Two stale dependency paths, found by `wf-lint` during a disk cleanup rather than by reading.
