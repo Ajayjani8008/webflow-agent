@@ -31,8 +31,9 @@ const args = process.argv.slice(2);
 const pos = args.filter(a => !a.startsWith('--'));
 const flag = (n, d) => { const f = args.find(x => x === `--${n}` || x.startsWith(`--${n}=`)); return f === undefined ? d : (f.includes('=') ? f.split('=').slice(1).join('=') : true); };
 const [url, sel, outDir] = pos;
+if (args.includes('--self-test')) { selfTest(); }
 if (!url || !sel || !outDir) {
-  console.error('usage: node verify-section.js <url> <selector> <outDir> [--section= --widths= --ref= --states= --audit --min= --cell= --height= --json]');
+  console.error('usage: node verify-section.js <url> <selector> <outDir> [--section= --widths= --ref= --states= --audit --min= --cell= --height= --json]   |   --self-test');
   process.exit(2);
 }
 const section = flag('section', sel.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'section');
@@ -46,6 +47,69 @@ const asJson = !!flag('json', false);
 const basePort = 9400 + (process.pid % 120);
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// "Blank" must be measured in PIXELS, never in compressed BYTES. A flat, legitimately simple section
+// (a dark 72px header bar with a wordmark) compresses under any byte threshold and was reported BLANK,
+// failing a correct build; conversely a large uniformly-empty PNG sailed past it. inkRatio returns the
+// fraction of pixels that differ from the modal (background) colour, so an empty shot is empty because
+// nothing rendered — not because PNG happened to compress well. Returns null if the PNG can't be read
+// (caller then falls back to the old byte heuristic rather than skipping the check).
+// Guards the blank rule against the regression it just fixed: a flat-but-real bar must NOT read blank,
+// and a big uniform PNG must. The old `bytes < 7000` rule failed both cases.
+function selfTest() {
+  let PNG; try { PNG = require('pngjs').PNG } catch (e) { console.error('SKIP self-test: pngjs missing (npm install here)'); process.exit(2) }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-selftest-'));
+  const write = (name, w, h, paint) => {
+    const p = new PNG({ width: w, height: h });
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4; const c = paint(x, y);
+      p.data[i] = c[0]; p.data[i + 1] = c[1]; p.data[i + 2] = c[2]; p.data[i + 3] = 255;
+    }
+    const f = path.join(tmp, name); fs.writeFileSync(f, PNG.sync.write(p)); return f;
+  };
+  const BG = [10, 4, 24];
+  const uniform = write('uniform.png', 1440, 400, () => BG);
+  // a dark bar with a small light wordmark: ~2% of pixels, and it compresses to a few KB
+  const flatBar = write('flat-bar.png', 1440, 72, (x, y) => (y > 24 && y < 48 && x > 40 && x < 200) ? [255, 255, 255] : BG);
+  let ok = true;
+  const cases = [
+    ['uniform PNG reads blank', inkRatio(uniform) < 0.001, true],
+    ['flat real bar does NOT read blank', inkRatio(flatBar) < 0.001, false],
+    ['old byte rule would have failed the real bar', fs.statSync(flatBar).size < 7000, true],
+  ];
+  for (const [name, got, want] of cases) {
+    const pass = got === want; ok = ok && pass;
+    console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}` + (pass ? '' : `  (got ${got}, want ${want})`));
+  }
+  console.log(`  ink: uniform=${(inkRatio(uniform) * 100).toFixed(3)}%  flat-bar=${(inkRatio(flatBar) * 100).toFixed(3)}%  flat-bar bytes=${fs.statSync(flatBar).size}`);
+  try { fs.rmSync(tmp, { recursive: true, force: true }) } catch (e) {}
+  process.exit(ok ? 0 : 1);
+}
+
+function inkRatio(file) {
+  let PNG;
+  try { PNG = require('pngjs').PNG } catch (e) {
+    try { PNG = require(path.join(__dirname, 'node_modules', 'pngjs')).PNG } catch (e2) { return null }
+  }
+  try {
+    const img = PNG.sync.read(fs.readFileSync(file));
+    const { width: w, height: h, data } = img;
+    const step = Math.max(1, Math.floor(Math.sqrt((w * h) / 40000)));   // ~40k samples max, enough for a ratio
+    const bucket = new Map(); const px = [];
+    for (let y = 0; y < h; y += step) for (let x = 0; x < w; x += step) {
+      const i = (y * w + x) * 4;
+      const q = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);  // 5-bit/channel key
+      bucket.set(q, (bucket.get(q) || 0) + 1);
+      px.push([data[i], data[i + 1], data[i + 2]]);
+    }
+    let modal = 0, best = -1;
+    for (const [q, n] of bucket) if (n > best) { best = n; modal = q }
+    const mr = ((modal >> 10) & 31) << 3, mg = ((modal >> 5) & 31) << 3, mb = (modal & 31) << 3;
+    let ink = 0;
+    for (const [r, g, b] of px) if (Math.abs(r - mr) > 12 || Math.abs(g - mg) > 12 || Math.abs(b - mb) > 12) ink++;
+    return px.length ? ink / px.length : null;
+  } catch (e) { return null }
+}
 const run = (script, argv) => new Promise(res => {
   const r = CDP.spawnSync(process.execPath, [path.join(__dirname, script), ...argv], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   res({ code: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() });
@@ -89,7 +153,8 @@ async function captureAll() {
       const file = path.join(outDir, `${section}-${W}.png`);
       fs.writeFileSync(file, Buffer.from(shot.data, 'base64'));
       const bytes = fs.statSync(file).size;
-      shots.push({ width: W, mobile: mob, file, bytes, box, blank: bytes < 7000 });
+      const ink = inkRatio(file);
+      shots.push({ width: W, mobile: mob, file, bytes, box, ink, blank: ink !== null ? ink < 0.001 : bytes < 7000 });
       // machine-checked overflow, so "no horizontal scroll" is measured, never eyeballed
       shots[shots.length - 1].overflow = await evalJS('document.documentElement.scrollWidth > document.documentElement.clientWidth + 2');
     }
@@ -108,7 +173,7 @@ async function captureAll() {
 
   for (const s of shots) {
     if (s.error) report.fails.push(`capture @${s.width}: ${s.error}`);
-    else if (s.blank) report.fails.push(`capture @${s.width}: blank shot (${s.bytes}B) — wrong clip, unpublished page, or content hidden`);
+    else if (s.blank) report.fails.push(`capture @${s.width}: blank shot (${s.ink !== null && s.ink !== undefined ? (s.ink * 100).toFixed(3) + '% non-background pixels' : s.bytes + 'B'}) — wrong clip, unpublished page, or content hidden`);
     if (s.overflow) report.fails.push(`horizontal overflow @${s.width} — scrollWidth exceeds viewport`);
   }
 

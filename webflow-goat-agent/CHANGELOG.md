@@ -2,6 +2,32 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.4 — 2026-08-07
+
+Found by building a real section (a mega-menu header) end to end. One gate was failing correct work, one
+hole let a content defect reach a publish, and three platform traps are now written down.
+
+- **`verify-section.js` decided "blank shot" from compressed BYTES** (`bytes < 7000`). A legitimately flat
+  section — a dark 72px header bar with a wordmark — compresses to 3-4KB, so three correct captures
+  (@991/@767/@390) were reported BLANK and the section FAILED. The inverse was worse: a large uniformly
+  empty PNG passed. Now measured in pixels: `inkRatio()` finds the modal (background) colour and returns the
+  fraction of pixels differing from it; blank = <0.1% ink. Strictly stronger — it catches an empty shot that
+  compresses badly, which the byte rule missed. `--self-test` added with three cases, including an explicit
+  assertion that the old byte rule would have failed the real bar. Verified on the real captures:
+  uniform 0.000% (blank) · real mobile bar 2.215% at 3,569 bytes (not blank).
+- **Placeholder sweep moved BEFORE the publish** (`webflow-core` step 5). `wf-preflight` already blocks
+  `set_text` on `TextBlock` with the right fix, but only for nodes the plan contains — nine panel titles were
+  built from children omitted from `tree`, so nothing checked them and they shipped as "This is some text
+  inside of a div block." until the published-HTML Rule 14 sweep caught it, one publish later. Step 5 now
+  requires the `allPlaceholderStrings` query plus a read-back of every node whose text was set, and states
+  that the plan must list every node to be created.
+- **Three verified MCP 2.0.1 traps in `error_learnings.md`:** `DropdownLink` is absent from the
+  `data_element_builder` enum (use `LinkBlock`/`TextLink` inside the `DropdownList`) · `TextBlock` never
+  accepts text at creation *or* afterwards, and reports as `Block` inside a component so a type query misses
+  it · a CMS item's image `fileId` is not a site asset id when collections were imported (re-register via
+  `create_asset` with the byte md5).
+- No gate, threshold or content rule was loosened. `wf-lint` 0/0.
+
 ## v2.1.3 — 2026-08-07
 
 Found by running the pipeline on a real section, not by reading it: `wf-resolve.js` accepted an unknown

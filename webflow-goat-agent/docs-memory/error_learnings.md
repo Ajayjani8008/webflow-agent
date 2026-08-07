@@ -134,3 +134,26 @@ grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.
 **Gate lesson:** at that point the section scored 98.75% PASS / 0 hot regions / a11y PASS / dom-contract 158-of-158 PASS **with a whole text line missing.** A global percentage cannot see a ~10px run in a 1632x117 bar and property equality cannot see an element that renders empty. The anchor eye-view is what caught it; `text-extents bands` (pixel-verify §1.4) is what makes it a number.
 
 **Also confirmed:** `Navbar` remains absent from the `data_element_builder` type enum (`available:false` in skeletons.json) — an API-built header cannot be a real Navbar. `Dropdown` IS available and ships `"Dropdown"` + `"Link 1..3"` placeholders plus an icon-font `Icon`; strip all five per dropdown in the same build pass.
+
+## 2026-08-07 — header build on new-hive-pro-design (MCP 2.0.1), three verified platform traps
+
+- **`DropdownLink` is NOT in the `data_element_builder` type enum** (only `Dropdown` is). A Dropdown's own
+  three links arrive with the wrapper, but you cannot create more. Native fix: build `LinkBlock` (needs
+  children) or `TextLink` (text only) inside the `DropdownList` — they render and the dropdown still toggles
+  them natively. Add it to a plan and `wf-preflight` will pass it; the MCP call is what rejects it.
+- **`TextBlock` never accepts text — not at creation, not afterwards.** `data_element_builder` silently
+  ignores `set_text` on it (element created, no error, default copy retained) and `data_element_tool >
+  set_text` answers "This element doesn't support text". Nine panel titles shipped as
+  "This is some text inside of a div block." and only the published-HTML Rule 14 sweep caught it.
+  **Use `Paragraph` for any text you intend to set**, with `margin-bottom: 0px` on its class.
+  Inside a component the element also reports `type: "Block"`, so a `type: "TextBlock"` query finds
+  nothing — query by class instead.
+- **A CMS item's image `fileId` is NOT a site asset id.** Binding it returns `Asset "<id>" not found`.
+  When collections are imported, `fieldData.icon.url` points at the ORIGIN site's CDN path. Re-register the
+  file with `create_asset` (md5 of the bytes) — content addressing returns the real id for this site, and if
+  the bytes already exist the upload POST is unnecessary (verify with a 200 on the returned hostedUrl).
+- **Webflow's dropdown chevron is absolutely positioned right inside the toggle.** With `padding: 0` on the
+  toggle it lands ON TOP of the label. Fix natively: a class on the icon-font `Icon` with
+  `position: relative; top/right/bottom/left: auto` plus `flex-direction: row-reverse` on the toggle so the
+  chevron follows the text. Every automated gate passed while the labels were unreadable — the mandatory
+  anchor eye-view is what caught it.
