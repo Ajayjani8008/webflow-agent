@@ -2,6 +2,23 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.2 — 2026-08-07
+
+Two stale dependency paths, found by `wf-lint` during a disk cleanup rather than by reading.
+
+- `pixel-verify` § script root and `session-recovery` § state both named `$WF/package.json`. Deps have
+  lived in `$WF/scripts/package.json` since v1.9.0 moved the scripts, so `npm install` at `$WF` created
+  a second dead `node_modules` (936KB) and the pack's own path check failed the moment the dead copy
+  was removed. Both lines now name `$WF/scripts/package.json`.
+- `wf-sync.sh` carried the same wrong path as an explicit pair (`$MEM/package.json` -> `scripts/package.json`),
+  which was also redundant: the `scripts/*.json` sweep four lines below already carries it. Pair removed.
+- `scripts/package-lock.json` now travels with the pack. "Deps are pinned" was only true of the ranges in
+  `package.json`; the lock that fixes the actual versions was never committed, so `wf-sync` reported it
+  missing from the repo forever and two machines could resolve different builds of `pixelmatch`/`pngjs`/`ws`.
+- No gate, threshold or check changed. `wf-lint` 0/0, `wf-sync` clean except the one intentional
+  divergence (`rules/common/agents.md` keeps the Divi site-resolution section the pack drops),
+  `pixel-diff.test.js` 5/5 green.
+
 ## v2.1.1 — 2026-08-01
 
 Closed the four weak points named after the v2.1 build, each with a check rather than a sentence.
