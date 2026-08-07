@@ -2,6 +2,35 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.6 — 2026-08-07
+
+`url-compile.js` — the missing half of `url-intake`, and the fix for the 204-call header.
+
+Figma sources compile (`figma-parse` -> `figma-compile` -> plan + contract). A URL source was hand-authored
+from the extract every time, which is why one header cost 204 tool calls, 5 publishes and shipped at 1.4%
+coverage. The extract was never the problem: nothing read it.
+
+`url-compile <extract.json> --prefix=<block> [--font=X]` emits a preflight-clean `plan.json` + a
+`dom-contract` contract straight from the reference's own captured values. On the cached squarespace.com
+header: **586 nodes -> 582 planned, 73 shared classes, 209 strings carried, 15 assets flagged**, and
+`wf-preflight` **PASS, 0 blockers**. Hand-authoring produced 20 strings from the same file.
+
+Every trap this pack has already paid for is compiled in, not left to the builder to remember:
+- text never lands on `TextBlock` (Paragraph/Heading/TextLink/LinkBlock/Button); `<a>` with children -> LinkBlock
+- shorthands expanded, including **`transition`** with paren-aware splitting so `cubic-bezier(0.165, 0.84, 0.44, 1)`
+  survives (25 preflight blockers on the first run — caught before a single MCP call)
+- Rule 15: every image class gets `flex-shrink:0` + an explicit box from the captured geometry
+- Rule 7 fluid base: a captured px width becomes `width:100%` + `max-width:<px>`; bare px only on intrinsic media
+- Rule 4: a class named after a native module is checked against behaviour — repeated equal-size siblings mean
+  BUILD THE MODULE (reported as NATIVE MODULE REQUIRED); a statically-rendering one is renamed truthfully and
+  the rename is printed, never silently
+- layout results are not authored values: fractional widths on text nodes dropped, kept for icon-sized media
+- proprietary font families substituted once, explicitly, and reported
+
+17 self-test cases. Two bugs found by its own EVIDENCE line during development: a duplicated `childrenOf`
+population exploded the tree to 1.4M nodes, and an over-broad `icon|logo` regex kept a 208px wrapper's
+measured width.
+
 ## v2.1.5 — 2026-08-07
 
 The pack shipped a header that matched its reference at **1.4% of strings** while `verify-section`,
