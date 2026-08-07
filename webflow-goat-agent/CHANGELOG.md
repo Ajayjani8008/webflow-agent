@@ -2,6 +2,36 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.5 — 2026-08-07
+
+The pack shipped a header that matched its reference at **1.4% of strings** while `verify-section`,
+`dom-contract` (46/46) and `page-audit` all read PASS. Three defects made that possible; all three are closed.
+
+- **`url-intake` had no REPLICA mode, and its third-party rule fired on source type.** "Reference → Webflow"
+  means *rebuild that reference*, but the skill said "third-party → user supplies their own content", so the
+  agent offered a menu where every option abandoned the reference and then obeyed it. Mode is now the FIRST
+  decision, **REPLICA is the default**, and switching to ADAPT requires the user's own words. What is never
+  copied is narrowed to what actually matters: logo/wordmark asset files, trademarks, photography. Text,
+  structure, geometry and behaviour ARE the reference.
+- **New `content-coverage.js` — the gate no pixel score can replace.** `inventory` pulls every distinct string
+  plus a class-group fingerprint out of a url/html capture at intake; `verify` compares the published page
+  against it. REPLICA fails below 100% and names the missing strings. Every pre-existing gate compares the
+  build against the agent's OWN spec, so substituted content was invisible to all of them — and a pixel score
+  cannot see it either, because different words in the right box still fill the box. Wired into the pipeline as
+  step 6b. Self-test: 5 cases (complete build passes · substituted content fails · adapt allows it · inventory
+  completeness · failure names the strings). Run against the shipped build it reports **2/139 = 1.4% FAIL**.
+- **Webflow Dropdown facts are now DATA, not prose** (`skeletons.json > modules.Dropdown.hardFacts`): never set
+  `display` on the DropdownList (Webflow's `.w-dropdown-list{display:none}` IS the closed state — overriding it
+  renders the panel permanently open) · the wrapper is `position:relative`, so a full-width panel needs the
+  wrapper `static` or it resolves against the toggle and clips · the icon-font Icon is absolutely positioned and
+  lands on top of the label at `padding:0` · `.w--open` is unreachable from `data_style_tool`, so open-state
+  styling is a Designer item. Each of the first three cost exactly one publish on 2026-08-07.
+- Added to the Never list: substituting a reference's content when the user asked for a replica · offering the
+  user a choice whose every option abandons the reference.
+- Still open, and the reason that build cost 204 calls: **there is no `url-compile`.** Figma has
+  `figma-parse` -> `figma-compile` -> plan.json + contract; a URL source is hand-authored from the extract every
+  time. Next release.
+
 ## v2.1.4 — 2026-08-07
 
 Found by building a real section (a mega-menu header) end to end. One gate was failing correct work, one

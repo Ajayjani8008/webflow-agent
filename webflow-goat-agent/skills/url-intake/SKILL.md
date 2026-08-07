@@ -7,7 +7,30 @@ description: Intake from a LIVE WEBSITE URL used as design reference ("build the
 
 Figma-grade accuracy: computed CSS from the real page = ground truth, zero guessing, zero vision estimates. This skill replaces design-intake §A/B/C for URL sources — do NOT also load design-intake source sections (its §D assets, §E validation, §F spec format still apply and are summarized here).
 
-**Scope check first (one line):** reference is the user's own site/property or they have rights → exact rebuild. Third-party site → rebuild layout/structure/patterns; never copy their logo, brand assets, photos, or copy verbatim — user supplies their own content. Ask once if unclear.
+## MODE FIRST — REPLICA or ADAPT. Get this wrong and nothing else matters.
+
+**Default is REPLICA.** "Build this from <url>", "reference → Webflow", "make my site like this" all mean
+**rebuild the reference: its structure AND its text**, so the user can see their reference standing up in
+Webflow. Do not ask which content to use, and never offer a menu whose options all point away from the
+reference — that is how a header shipped at **1.4% string coverage** on 2026-08-07 while every other gate
+read PASS.
+
+| Mode | When | Content |
+|---|---|---|
+| **REPLICA** (default) | the user gave a URL as the thing to reproduce | the reference's own strings, verbatim, all of them. `content-coverage.js` enforces 100% |
+| **ADAPT** | the user says so in their own words — "use my content", "my nav items", "keep the layout only" | their content in the reference's structure; slot COUNTS still match the reference |
+
+Switching to ADAPT requires the user's words, not the agent's inference. Announce the mode in one line
+(`mode: replica`) and write it into the spec — `pixel-verify` and `content-coverage` both read it.
+
+**What is never copied in either mode:** the reference's logo/wordmark asset file, trademarked marks, and its
+photography/illustration files. Rebuild those as a text wordmark or the user's own asset, and say so in one
+line. Text, structure, geometry, and behaviour ARE the reference — that is what a replica is.
+
+**Intake must therefore capture the content, not just the boxes:**
+`node "$WF/scripts/content-coverage.js" inventory ref-cache/{domain}/{section}-1440.json specs/{section}.inventory.json`
+→ every distinct string plus the class-group fingerprint. This runs at intake, before any plan is written,
+and the plan is built FROM it. A plan with fewer strings than the inventory is an incomplete plan.
 
 ## REF-CACHE — fetch-once, like figma-cache
 
