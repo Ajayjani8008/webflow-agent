@@ -55,6 +55,67 @@ const SHORTHAND = {
 // intrinsic sizes are authored; a text node's measured width is not
 const INTRINSIC_TAGS = new Set(['img', 'svg', 'video', 'canvas']);
 
+
+// ── Naming is NOT the reference's problem to solve ───────────────────────────────────────────────
+// v2.1.8: this compiler originally took the reference's BEM suffix as the class name, because the site it
+// was first written against used BEM. On a utility-class reference (Tailwind) the bar, the nav and the
+// button group all carry `flex`, so all three COLLAPSED into one class and styling one restyled the others.
+// On a hashed reference (styled-components / CSS modules) it emitted `site-header__css-1a2b3c` — garbage
+// baked permanently into the client's site. A reference's class names are an accident of its build tool.
+//
+// So: class IDENTITY comes from (element role + authored-style fingerprint), never from the reference's
+// class string. The reference's name is used only when it is SEMANTIC, and only to make the name readable.
+const UTILITY_RE = /^(?:-?[a-z]+:)?(?:sm|md|lg|xl|2xl):?|^(?:flex|grid|block|inline|hidden|relative|absolute|fixed|sticky|container|row|col)$|^(?:[mp][xytblr]?|w|h|min|max|gap|space|text|bg|border|rounded|shadow|opacity|z|top|left|right|bottom|justify|items|content|self|order|basis|grow|shrink|font|leading|tracking|uppercase|lowercase|capitalize|truncate|overflow|cursor|transition|duration|ease|delay|scale|rotate|translate|hover|focus|group)(?:-|$)/;
+const OPAQUE_RE = /^(?:css|sc|emotion|jsx|styles?|module)[-_][a-z0-9]{4,}$|^[a-z]{1,3}[A-Za-z]*[0-9][A-Za-z0-9]{3,}$|^[a-f0-9]{6,}$/i;
+
+function namingStyleOf(nodes) {
+  let semantic = 0, utility = 0, opaque = 0, counted = 0;
+  for (const n of nodes) {
+    const toks = String(n.class || '').split(/\s+/).filter(Boolean);
+    if (!toks.length) continue;
+    counted++;
+    if (toks.some(t => t.includes('__'))) { semantic++; continue }
+    if (toks.some(t => OPAQUE_RE.test(t))) { opaque++; continue }
+    if (toks.length >= 3 && toks.filter(t => UTILITY_RE.test(t)).length >= Math.ceil(toks.length / 2)) { utility++; continue }
+    if (toks.some(t => t.length >= 8 && t.includes('-'))) { semantic++; continue }
+    utility++;
+  }
+  if (!counted) return 'none';
+  if (semantic / counted >= 0.4) return 'semantic';
+  if (opaque / counted >= 0.3) return 'opaque';
+  return 'utility';
+}
+
+// A readable role for a node, derived from what it IS — works on any reference, with or without classes.
+function roleOf(n, kids, sizeRank) {
+  const t = String(n.tag || '').toLowerCase();
+  const s = n.styles || {}; const b = n.box || {};
+  if (t === 'img' || t === 'svg') return (b.w && b.w <= 64 && b.h && b.h <= 64) ? 'icon' : 'image';
+  if (/^h[1-6]$/.test(t)) return 'heading';
+  if (t === 'button') return 'button';
+  if (t === 'a') return kids.length ? 'link-block' : 'link';
+  if (t === 'nav') return 'nav';
+  if (t === 'ul' || t === 'ol') return 'list';
+  if (t === 'li') return 'list-item';
+  if (n.text && !kids.length) {
+    if (sizeRank === 0) return 'title';
+    if (sizeRank === 1) return 'subtitle';
+    const fs = parseFloat(s['font-size'] || '0');
+    if (fs && fs <= 12) return 'eyebrow';
+    return 'text';
+  }
+  if (String(s.display || '').includes('grid')) return 'grid';
+  if (String(s.display || '').includes('flex')) return String(s['flex-direction'] || '').startsWith('column') ? 'col' : 'row';
+  return 'group';
+}
+
+// Fingerprint = tag + the authored properties that actually matter. Two nodes share a class only if this
+// matches; that is what stops three different `flex` containers from becoming one class.
+function fingerprint(tag, role, props) {
+  const keys = Object.keys(props).sort();
+  return [tag, role, ...keys.map(k => k + ':' + props[k])].join('|');
+}
+
 const kebab = s => String(s).replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 
 // `transition` is a shorthand too, and data_style_tool voids shorthands into the Custom Properties panel.
@@ -112,6 +173,12 @@ function compile() {
     if (!childrenOf.has(pp0)) childrenOf.set(pp0, []);
     childrenOf.get(pp0).push(n);
   }
+  const naming = namingStyleOf(nodes);
+  // font-size ranking gives "title"/"subtitle" real meaning on a reference with no useful class names
+  const sizes = [...new Set(nodes.map(n => parseFloat((n.styles || {})['font-size'] || '0')).filter(Boolean))].sort((a, b) => b - a);
+  const rankOf = n => sizes.indexOf(parseFloat((n.styles || {})['font-size'] || '0'));
+
+  const byFingerprint = new Map();     // (tag|role|props) -> generated class name   <- class IDENTITY
   const classOf = new Map();          // reference class signature -> generated class name
   const classProps = new Map();       // generated class -> properties object
   const usedNames = new Set();
@@ -126,63 +193,73 @@ function compile() {
 
   const renames = []; const moduleNeeded = [];
   const MODULE_WORDS = /(carousel|slider|marquee|tabs|accordion|lightbox|dropdown)/i;
-  const nameFor = n => {
-    let sig = refSig(n);
-    if (sig && MODULE_WORDS.test(sig)) {
-      // does it actually behave like that module here? a carousel needs >=2 sibling slides of equal size
-      const kids = (childrenOf.get(n.path) || []);
-      const sizes = kids.map(k => `${Math.round((k.box || {}).w || 0)}x${Math.round((k.box || {}).h || 0)}`);
-      const repeated = sizes.length >= 2 && new Set(sizes).size < sizes.length;
-      if (!repeated) {
-        const was = sig;
-        sig = sig.replace(MODULE_WORDS, 'cards');
-        renames.push(`${was} -> ${sig} (renders statically here: ${kids.length} child(ren), no repeated slide box — a div named after a module would fail the native-module gate)`);
-      } else {
-        moduleNeeded.push(`${sig} at ${n.path} — build the NATIVE module, not a div`);
+
+  // readable NAME (may repeat across different fingerprints; disambiguated with -2, -3)
+  const nameHintFor = n => {
+    const kids = childrenOf.get(n.path) || [];
+    const role = roleOf(n, kids, rankOf(n));
+    let hint = null;
+    if (naming === 'semantic') {
+      let sig = refSig(n);
+      if (sig && MODULE_WORDS.test(sig)) {
+        const sz = kids.map(k => `${Math.round((k.box || {}).w || 0)}x${Math.round((k.box || {}).h || 0)}`);
+        const repeated = sz.length >= 2 && new Set(sz).size < sz.length;
+        if (!repeated) { const was = sig; sig = sig.replace(MODULE_WORDS, 'cards'); renames.push(`${was} -> ${sig} (renders statically here: ${kids.length} child(ren), no repeated slide box)`) }
+        else moduleNeeded.push(`${sig} at ${n.path} — build the NATIVE module, not a div`);
       }
+      hint = sig;
     }
-    const base = sig ? `${prefix}__${kebab(sig)}` : `${prefix}__${kebab(n.tag)}`;
-    if (classOf.has(sig || n.tag)) return classOf.get(sig || n.tag);
-    let name = base, i = 2;
-    while (usedNames.has(name) && !classOf.has(sig || n.tag)) { name = `${base}-${i++}` }
-    usedNames.add(name); classOf.set(sig || n.tag, name);
-    return name;
+    // utility / opaque / classless references: the reference's own names are worthless or harmful
+    if (!hint) hint = role;
+    return { hint: kebab(hint), role };
   };
 
-  const propsFor = (n, cls) => {
-    if (classProps.has(cls)) return;                       // first node with this class authors it
-    const s = n.styles || {}; const out = {};
-    for (const [k, v] of Object.entries(s)) {
+  const authoredProps = n => {
+    const s2 = n.styles || {}; const out = {};
+    for (const [k, v] of Object.entries(s2)) {
       if (!KEEP.has(k)) continue;
-      if (v === undefined || v === null || v === '' || v === 'auto' && !['top', 'right', 'bottom', 'left'].includes(k)) continue;
+      if (v === undefined || v === null || v === '' || (v === 'auto' && !['top', 'right', 'bottom', 'left'].includes(k))) continue;
       if (k === 'font-family' && font) { out[k] = font; continue }
       if (['width', 'height', 'min-height', 'flex-basis', 'max-width'].includes(k)) {
-        const frac = /^\d+\.\d+px$/.test(String(v));
-        // "logo-link" is a 208px wrapper, not an icon: a name hint only counts when the box is icon-sized.
+        const frac = /^\d+(\.\d+)?px$/.test(String(v)) && /\.\d/.test(String(v));
         const b = n.box || {};
         const iconSized = b.w > 0 && b.w <= 64 && b.h > 0 && b.h <= 64;
         const intrinsic = INTRINSIC_TAGS.has(n.tag) || (iconSized && /icon|logo|avatar|badge|mark|chevron|arrow/i.test(String(n.class || '')));
-        if (frac && !intrinsic) { continue }               // measured result, not an authored value
+        if (frac && !intrinsic) continue;
       }
       if (k === 'transition') { Object.assign(out, expandTransition(v)); continue }
       if (SHORTHAND[k]) { for (const long of SHORTHAND[k]) out[long] = v; continue }
       out[k] = v;
     }
-    // Fluid base (Rule 7): a captured px width is the reference VIEWPORT, not responsive intent.
-    // Containers get width:100% + max-width; bare px stays only on intrinsic media.
+    // fluid base (Rule 7)
     if (out.width && /^\d+(\.\d+)?px$/.test(String(out.width)) && !INTRINSIC_TAGS.has(n.tag)) {
-      const px = String(out.width);
-      out.width = '100%';
+      const px = String(out.width); out.width = '100%';
       if (!out['max-width'] || out['max-width'] === 'none') out['max-width'] = px;
     }
-    // Rule 15: an icon/image must never be allowed to collapse in a flex row, and it needs an explicit box.
+    // Rule 15
     if (INTRINSIC_TAGS.has(n.tag)) {
       out['flex-shrink'] = '0';
       const b = n.box || {};
       if (!out.width && b.w) out.width = Math.round(b.w) + 'px';
       if (!out.height && b.h) out.height = Math.round(b.h) + 'px';
     }
-    classProps.set(cls, out);
+    return out;
+  };
+
+  // CLASS IDENTITY = tag + role + authored props. Same look and same job -> one shared class (a semantic
+  // reference still collapses to a few dozen). Different look -> different class, even if the reference
+  // gave them the same utility token. This is the whole fix for non-BEM references.
+  const classFor = n => {
+    const props = authoredProps(n);
+    const { hint, role } = nameHintFor(n);
+    const fp = fingerprint(n.tag, role, props);
+    if (byFingerprint.has(fp)) return byFingerprint.get(fp);
+    let name = `${prefix}__${hint}`, i = 2;
+    while (usedNames.has(name)) name = `${prefix}__${hint}-${i++}`;
+    usedNames.add(name);
+    byFingerprint.set(fp, name);
+    classProps.set(name, props);
+    return name;
   };
 
   const typeFor = (n, hasElementChildren) => {
@@ -213,8 +290,7 @@ function compile() {
     const kids = (childrenOf.get(n.path) || []).filter(buildable);
     const hasKids = kids.length > 0;
     const t = typeFor(n, hasKids);
-    const cls = nameFor(n);
-    propsFor(n, cls);
+    const cls = classFor(n);
     planned++;
     const schema = { type: t.type, styleNames: [cls] };
     if (t.setTag) schema.setTag = t.setTag;
@@ -251,6 +327,7 @@ function compile() {
   const needsAsset = JSON.stringify(plan).split('"needsAsset"').length - 1;
   if (has('json')) { console.log(JSON.stringify({ planned, classes: classes.length, strings: strings.length, skips, planOut, conOut }, null, 1)); return }
   console.log(`EVIDENCE url-compile — OK   ${section}`);
+  console.log(`  reference naming   ${naming}${naming === 'semantic' ? ' (its BEM suffixes are readable, so names reuse them)' : ' (its class names are ' + (naming === 'opaque' ? 'hashed/build-generated' : naming === 'utility' ? 'utility soup' : 'absent') + ' — names derived from ROLE instead)'}`);
   console.log(`  nodes in extract   ${nodes.length}`);
   console.log(`  nodes planned      ${planned}   (skipped ${skips.length})`);
   console.log(`  shared classes     ${classes.length}   <- ${nodes.length} nodes collapse to this many authored classes`);
@@ -310,6 +387,45 @@ function selfTest() {
   ];
   let ok = true;
   for (const [name, got, want] of cases) { const pass = got === want; ok = ok && pass; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}` + (pass ? '' : `  (got ${JSON.stringify(got)}, want ${JSON.stringify(want)})`)) }
+
+  // ── the reference's class convention must not decide the output (v2.1.8) ─────────────────────
+  // A utility-class reference put `flex` on three structurally different containers; keying classes on the
+  // reference's names collapsed all three into one, so styling the bar restyled the nav and the buttons.
+  const util = path.join(tmp, 'util.json');
+  fs.writeFileSync(util, JSON.stringify({ url: 'https://u.com/', viewport: { width: 1440 }, nodes: [
+    { tag: 'header', depth: 0, path: 'header', class: 'flex items-center justify-between px-10 h-20', box: { x: 0, y: 0, w: 1440, h: 80 }, styles: { display: 'flex', height: '80px', 'padding-left': '40px' } },
+    { tag: 'div', depth: 1, path: 'header>div', class: 'flex gap-8', box: { x: 400, y: 0, w: 600, h: 80 }, styles: { display: 'flex', 'column-gap': '32px' } },
+    { tag: 'div', depth: 1, path: 'header>div[2]', class: 'flex gap-4', box: { x: 1100, y: 20, w: 300, h: 40 }, styles: { display: 'flex', 'column-gap': '16px' } },
+    { tag: 'a', depth: 2, path: 'header>div>a', class: 'text-sm uppercase', text: 'Product', box: { x: 410, y: 30, w: 70, h: 20 }, styles: { 'font-size': '14px' } },
+  ] }));
+  const up = path.join(tmp, 'u.plan.json');
+  run([util, '--prefix=site-header', '--out-plan=' + up, '--out-contract=' + path.join(tmp, 'u.c.json')]);
+  const uplan = JSON.parse(fs.readFileSync(up, 'utf8'));
+  const uflat = JSON.stringify(uplan);
+  const uNames = uplan.classes.map(c => c.name);
+  const containerClasses = new Set([uplan.tree.styleNames[0], ...(uplan.tree.children || []).filter(c => c.type === 'DivBlock').map(c => c.styleNames[0])]);
+
+  // A hashed / build-generated reference must never leak its names into the client's site.
+  const opaque = path.join(tmp, 'op.json');
+  fs.writeFileSync(opaque, JSON.stringify({ url: 'https://o.com/', viewport: { width: 1440 }, nodes: [
+    { tag: 'header', depth: 0, path: 'header', class: 'css-1a2b3c', box: { x: 0, y: 0, w: 1440, h: 72 }, styles: { display: 'flex' } },
+    { tag: 'span', depth: 1, path: 'header>span', class: 'css-9z8y7x', text: 'Brand', box: { x: 32, y: 20, w: 70, h: 28 }, styles: { 'font-size': '18px' } },
+    { tag: 'a', depth: 1, path: 'header>a[2]', class: 'sc-bdVaJa hGtqPm', text: 'Docs', box: { x: 420, y: 26, w: 50, h: 20 }, styles: { 'font-size': '14px' } },
+  ] }));
+  const op = path.join(tmp, 'o.plan.json');
+  run([opaque, '--prefix=site-header', '--out-plan=' + op, '--out-contract=' + path.join(tmp, 'o.c.json')]);
+  const oflat = fs.readFileSync(op, 'utf8');
+
+  const more = [
+    ['utility reference: containers do NOT collapse into one class', containerClasses.size, 3],
+    ['utility reference: no utility token becomes a class name', /__(flex|text-sm|px-10|gap-8|rounded-lg)\b/.test(uflat), false],
+    ['utility reference: names are roles', uNames.some(n => /__(row|col|group|link|title|nav)/.test(n)), true],
+    ['hashed reference: no build-generated name leaks through', /css-1a2b3c|sc-bdvaja|hgtqpm/i.test(oflat), false],
+    ['hashed reference: still produces readable role names', /__(row|title|link|nav)/.test(oflat), true],
+    ['naming style is detected and reported, not assumed', /reference naming/.test(run([util, '--prefix=x', '--out-plan=' + path.join(tmp, 'x.json'), '--out-contract=' + path.join(tmp, 'xc.json')]).out), true],
+  ];
+  for (const [name, got, want] of more) { const pass = got === want; ok = ok && pass; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}` + (pass ? '' : `  (got ${JSON.stringify(got)}, want ${JSON.stringify(want)})`)) }
+
   try { fs.rmSync(tmp, { recursive: true, force: true }) } catch (e) {}
   process.exit(ok ? 0 : 1);
 }

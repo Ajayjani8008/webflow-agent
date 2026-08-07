@@ -157,3 +157,18 @@ grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.
   `position: relative; top/right/bottom/left: auto` plus `flex-direction: row-reverse` on the toggle so the
   chevron follows the text. Every automated gate passed while the labels were unreadable — the mandatory
   anchor eye-view is what caught it.
+
+## 2026-08-07 — a fix written against one reference encodes that reference
+
+Three times in one session a fix was scoped to the instance in front of the agent instead of the class:
+1. replica mode + the coverage gate went into `url-intake` only — `html-intake` and `design-intake` had zero
+   mentions, so a screenshot or HTML delivery could still substitute a reference's content undetected.
+2. `url-compile` + `content-coverage` were written, but `wf-section intake` still hard-required `--dcjsx`, so
+   nothing could reach them on any other site: the scripts were orphans.
+3. `url-compile` keyed class names on the reference's BEM suffix because squarespace.com uses BEM. A Tailwind
+   reference collapsed three different containers into one class; a styled-components reference emitted
+   `__css-1a2b3c` into the client's site.
+
+The test that catches all three, and it is cheap: **before claiming a fix is general, run it on an input shaped
+deliberately unlike the one that prompted it**, and grep whether anything in the pipeline actually CALLS the new
+code. Existence is not reachability.

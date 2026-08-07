@@ -2,6 +2,33 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.8 — 2026-08-07
+
+`url-compile` was written against ONE reference site's conventions. Caught by the user, proven with two
+non-Squarespace references, fixed at the root.
+
+The compiler took its class names from the reference's BEM suffix, because squarespace.com uses BEM. On a
+**utility-class reference** (Tailwind) the bar, the nav group and the actions group all carry `flex`, so all
+three collapsed into a single `__flex` class — styling the bar restyled the nav and the buttons. On a
+**hashed reference** (styled-components / CSS modules) it emitted `site-header__css-1a2b3c`, baking a build
+tool's throwaway names permanently into the client's site. Most modern reference sites are one of those two.
+
+- **Class IDENTITY is now `(tag + element role + authored-style fingerprint)`** — never the reference's class
+  string. Two nodes share a class only when they are the same kind of thing AND look the same. A semantic
+  reference still collapses to a few dozen shared classes; a utility reference no longer merges unrelated
+  containers. Squarespace's header went 73 -> 111 classes because elements that merely shared a BEM *name*
+  while looking different are no longer silently merged: the same defect, previously invisible.
+- **Naming style is detected per capture and reported** — `semantic` / `utility` / `opaque` / `none`. Semantic
+  references keep their readable suffixes; everything else gets **role-derived** names (`__row`, `__col`,
+  `__nav`, `__title`, `__eyebrow`, `__icon`, `__image`, `__link`, `__link-block`, `__list-item`), where the
+  role comes from tag, layout direction, media size and font-size rank — facts every reference has.
+- 6 new self-tests on deliberately non-BEM fixtures: containers do not collapse · no utility token becomes a
+  class name · names are roles · no build-generated name leaks · role names stay readable · the style is
+  detected rather than assumed. 23 cases total, and the Squarespace path still preflights **PASS, 0 blockers**.
+
+The general lesson, recorded because it recurred three times today: a fix written while looking at one
+reference tends to encode that reference. The check is to run it against inputs shaped differently on purpose.
+
 ## v2.1.7 — 2026-08-07
 
 v2.1.5 and v2.1.6 fixed the INSTANCE, not the CLASS. The user was right to call it out: the new capability
