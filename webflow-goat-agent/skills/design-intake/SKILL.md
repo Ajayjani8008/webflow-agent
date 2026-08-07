@@ -5,6 +5,28 @@ description: What to pull from a Figma file or screenshot BEFORE building in Web
 
 # Design Intake
 
+## MODE — REPLICA or ADAPT, decided in one line before intake (v2.1.7, applies to EVERY source)
+
+**REPLICA is the default.** A reference handed over to be rebuilt means rebuild it: its structure AND its
+text. **ADAPT** — the user's own content in the reference's structure — requires the user's own words, never
+the agent's inference, and even then the per-group SLOT COUNTS still match the reference.
+
+Capture the content, not just the boxes, or nothing downstream can tell the difference:
+`node "$WF/scripts/content-coverage.js" inventory <capture.json> specs/<section>.inventory.json`
+then `webflow-core` step 6b verifies the published page against it (`--mode=replica` fails below 100%).
+
+Measured 2026-08-07: a header passed `verify-section`, `dom-contract` 46/46 and `page-audit` while carrying
+**1.4%** of its reference's 139 strings. Every other gate compares the build to the agent's OWN spec, and a
+pixel score cannot see substituted copy at all — different words still fill the same box.
+
+**Figma** compiles through the same one call: `wf-section.js intake … --dcjsx=<node.dc.jsx>`
+(`figma-parse` → `figma-compile` → `wf-preflight`).
+**A screenshot has no machine capture**, so it gets no automatic inventory — which makes it the ONE source
+where substituted content cannot be caught by a tool. Therefore: transcribe every visible string into the
+spec at intake and check them off against the render by eye before the section closes. Say `mode: replica`
+or `mode: adapt` in the spec either way.
+
+
 Capture every value the build needs — guessing ≠ pixel-perfect. Once per section, before building. The spec produced here is pixel-verify's diff checklist — incomplete spec = blind verification.
 
 ## R. RENDER FIRST (before extracting any values — every source)

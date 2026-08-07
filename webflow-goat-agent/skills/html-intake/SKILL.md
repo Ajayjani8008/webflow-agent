@@ -5,6 +5,27 @@ description: Intake from an HTML/CSS/JS delivery used as the build source (files
 
 # HTML Intake — the delivery is a behaviour contract
 
+## MODE — REPLICA or ADAPT, decided in one line before intake (v2.1.7, applies to EVERY source)
+
+**REPLICA is the default.** A reference handed over to be rebuilt means rebuild it: its structure AND its
+text. **ADAPT** — the user's own content in the reference's structure — requires the user's own words, never
+the agent's inference, and even then the per-group SLOT COUNTS still match the reference.
+
+Capture the content, not just the boxes, or nothing downstream can tell the difference:
+`node "$WF/scripts/content-coverage.js" inventory <capture.json> specs/<section>.inventory.json`
+then `webflow-core` step 6b verifies the published page against it (`--mode=replica` fails below 100%).
+
+Measured 2026-08-07: a header passed `verify-section`, `dom-contract` 46/46 and `page-audit` while carrying
+**1.4%** of its reference's 139 strings. Every other gate compares the build to the agent's OWN spec, and a
+pixel score cannot see substituted copy at all — different words still fill the same box.
+
+**HTML deliveries compile like URLs.** Run the delivery through `ref-extract.js` on a `file://` URL to get
+the same capture shape, then ONE call does the rest:
+`node "$WF/scripts/wf-section.js" intake --site=<dir> --section=<name> --prefix=<block> --extract=<capture.json>`
+→ `url-compile` (plan + contract, every known trap compiled in) → content inventory → `wf-preflight`.
+Hand-authoring a plan from a delivery you already captured is the mistake that cost 204 calls on 2026-08-07.
+
+
 Split out of design-intake in v1.8.0 (source isolation: a Figma build must not pay for these tables, and vice versa). Everything else in the pipeline is unchanged — this produces the same spec format as design-intake § Output — and like it, the spec is WRITTEN to `$WF/sites/<site-id>/specs/<section>.md` (v1.10.0), never left in conversation only, and pixel-verify / responsive-pass don't care where the spec came from.
 
 **Still applies from `design-intake`, don't duplicate it here:** § R render-first study · § D assets · § E validation checkpoint · § CF content fidelity · § Output spec format. Load design-intake for those sections only if the build needs them spelled out; the rules below assume them.

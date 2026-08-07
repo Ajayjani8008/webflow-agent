@@ -2,6 +2,28 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.7 — 2026-08-07
+
+v2.1.5 and v2.1.6 fixed the INSTANCE, not the CLASS. The user was right to call it out: the new capability
+was unreachable on any other site or reference.
+
+- **`wf-section.js intake` — pipeline step 2, the command actually invoked — hard-required `--dcjsx` and died
+  without it.** It was Figma-only, so `url-compile` and `content-coverage` were orphan scripts: on the next
+  site, with a URL or HTML reference, intake refuses to run and the agent falls back to hand-authoring — the
+  exact behaviour that cost 204 calls. Intake is now **source-agnostic**: `--dcjsx` (figma -> figma-parse ->
+  figma-compile) or `--extract` (url/html -> url-compile -> content inventory), then `wf-preflight` either way.
+  One source only; passing both is refused; passing neither names both paths. `--mode` defaults to `replica`.
+  Also forwards `--site-prefix`/`--known-prefixes` so the block-prefix check is actually on.
+- **Replica-vs-adapt and the coverage gate now live in EVERY intake skill, not just `url-intake`.**
+  `html-intake` had 0 mentions and `design-intake` (figma + screenshot) had 0 — so a screenshot or an HTML
+  delivery could still silently substitute a reference's content and no gate would notice. All four sources
+  now carry the same mode decision and the same inventory step.
+- **HTML deliveries share the compiler**: capture the delivery through `ref-extract` on a `file://` URL and it
+  is the same one intake call. Screenshots are named as the one source with no machine capture, so the spec
+  must transcribe every visible string and check it by eye — stated instead of silently absent.
+- 8 new `wf-section` self-tests (12 total): url/html compiles through intake · inventory written · replica is
+  the default · both-sources refused · no-source names both paths.
+
 ## v2.1.6 — 2026-08-07
 
 `url-compile.js` — the missing half of `url-intake`, and the fix for the 204-call header.

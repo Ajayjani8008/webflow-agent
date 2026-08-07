@@ -6,13 +6,18 @@
 // calling were already correct. What was missing is that each one had to be invoked, read and reasoned
 // about separately. This chains them:
 //
-//   intake   figma-parse -> figma-compile -> wf-preflight            (1 call, blocks a bad plan)
+//   intake   ANY source -> plan + contract (+ content inventory) -> wf-preflight   (1 call, blocks a bad plan)
+//            figma:    figma-parse -> figma-compile
+//            url/html: url-compile -> content-coverage inventory
 //   verify   verify-section -> dom-contract                          (1 call, one EVIDENCE set)
 //   record   build_state + registry + spec status                    (1 call, one write pass)
 //
 // Usage:
-//   node wf-section.js intake --site=<dir> --section=<name> --dcjsx=<file> --prefix=<block>
-//                             [--root=<nodeId>] [--section-tag]
+//   node wf-section.js intake --site=<dir> --section=<name> --prefix=<block>
+//                             --dcjsx=<node.dc.jsx>        # figma
+//                             | --extract=<capture.json>   # url or html delivery
+//                             [--mode=replica|adapt] [--font=X] [--root=<nodeId>] [--section-tag]
+//                             [--site-prefix=<id>] [--known-prefixes=a,b]
 //   node wf-section.js verify --site=<dir> --section=<name> --url=<published> --sel="<css>"
 //                             [--widths=1440,991,767,390] [--ref=<dir>] [--states=base,auto]
 //                             [--audit] [--width=1920] [--no-contract]
@@ -68,27 +73,56 @@ function stage(label, script, args, { optional = false } = {}) {
 function intake() {
   const dir = siteDir();
   const section = opt('section') || die('--section=<name> is required');
-  const dcjsx = opt('dcjsx') || die('--dcjsx=<node.dc.jsx> is required (from get_design_context)');
   const prefix = opt('prefix') || section;
-  if (!fs.existsSync(dcjsx)) die('not found: ' + dcjsx);
-
-  const base = dcjsx.replace(/\.dc\.jsx$/, '');
-  const parsed = base + '.parsed.json';
-  const plan = base + '.plan.json';
-  const contract = path.join(dir, 'specs', section + '.contract.json');
   fs.mkdirSync(path.join(dir, 'specs'), { recursive: true });
 
-  console.log('EVIDENCE wf-section intake  section=' + section);
-  let r = stage('parse', 'figma-parse.js', [dcjsx, '--out=' + parsed]);
-  if (r.code !== 0) { console.log('  FAIL  figma-parse'); process.exit(1); }
+  // SOURCE-AGNOSTIC (v2.1.7). This used to hard-require --dcjsx, so it was Figma-only: a URL or HTML
+  // reference had no compile path at all and got hand-authored, which is how one header cost 204 calls
+  // and shipped at 1.4% of its reference's strings. Every reference type now compiles through here.
+  //   --dcjsx=<file>          figma  -> figma-parse -> figma-compile
+  //   --extract=<file>        url/html -> url-compile (a ref-extract capture; html-intake produces the
+  //                           same shape by running the delivery through ref-extract on a file:// URL)
+  const dcjsx = opt('dcjsx'), extract = opt('extract');
+  if (!dcjsx && !extract) die('give the source: --dcjsx=<node.dc.jsx> (figma) or --extract=<ref-extract.json> (url/html).\n' +
+    '  A screenshot source has no machine capture — write the spec by hand and run wf-preflight on the plan yourself.');
+  if (dcjsx && extract) die('pass ONE source, not both — hybrid sources declare roles in the spec (webflow-core § C).');
+  const src = dcjsx || extract;
+  if (!fs.existsSync(src)) die('not found: ' + src);
 
-  const cargs = [parsed, '--prefix=' + prefix, '--out-plan=' + plan, '--out-contract=' + contract];
-  if (opt('root')) cargs.push('--root=' + opt('root'));
-  if (flag('section-tag')) cargs.push('--section-tag');
-  r = stage('compile', 'figma-compile.js', cargs);
-  if (r.code !== 0) { console.log('  FAIL  figma-compile'); process.exit(1); }
+  const mode = (opt('mode') || 'replica').toLowerCase();
+  if (!['replica', 'adapt'].includes(mode)) die('--mode must be replica or adapt (webflow-core § url-intake: replica is the default)');
 
-  r = stage('preflight', 'wf-preflight.js', [plan]);
+  const base = src.replace(/\.dc\.jsx$/, '').replace(/\.json$/, '');
+  const parsed = base + '.parsed.json';
+  const plan = path.join(dir, 'specs', section + '.plan.json');
+  const contract = path.join(dir, 'specs', section + '.contract.json');
+  const inventory = path.join(dir, 'specs', section + '.inventory.json');
+
+  console.log('EVIDENCE wf-section intake  section=' + section + '  source=' + (dcjsx ? 'figma' : 'url/html') + '  mode=' + mode);
+  let r;
+  if (dcjsx) {
+    r = stage('parse', 'figma-parse.js', [dcjsx, '--out=' + parsed]);
+    if (r.code !== 0) { console.log('  FAIL  figma-parse'); process.exit(1); }
+    const cargs = [parsed, '--prefix=' + prefix, '--out-plan=' + plan, '--out-contract=' + contract];
+    if (opt('root')) cargs.push('--root=' + opt('root'));
+    if (flag('section-tag')) cargs.push('--section-tag');
+    r = stage('compile', 'figma-compile.js', cargs);
+    if (r.code !== 0) { console.log('  FAIL  figma-compile'); process.exit(1); }
+  } else {
+    const cargs = [extract, '--prefix=' + prefix, '--section=' + section, '--out-plan=' + plan, '--out-contract=' + contract];
+    if (opt('font')) cargs.push('--font=' + opt('font'));
+    if (opt('max-depth')) cargs.push('--max-depth=' + opt('max-depth'));
+    r = stage('compile', 'url-compile.js', cargs);
+    if (r.code !== 0) { console.log('  FAIL  url-compile'); process.exit(1); }
+    // the content inventory is what makes a substituted-copy build detectable at all
+    r = stage('inventory', 'content-coverage.js', ['inventory', extract, inventory]);
+    if (r.code !== 0) { console.log('  FAIL  content-coverage inventory'); process.exit(1); }
+    console.log('  inventory ' + inventory + '   <- step 6b verifies the published page against this, --mode=' + mode);
+  }
+
+  r = stage('preflight', 'wf-preflight.js', [plan,
+    ...(opt('site-prefix') ? ['--site-prefix=' + opt('site-prefix')] : []),
+    ...(opt('known-prefixes') ? ['--known-prefixes=' + opt('known-prefixes')] : [])]);
   const verdict = r.code === 0 ? 'PASS' : 'BLOCKED';
 
   console.log('  plan      ' + plan);
@@ -300,6 +334,20 @@ function selfTest() {
   t('missing site dir rejected', r.code === 2, r.out);
   r = run(['intake', '--site=' + site, '--section=hero', '--dcjsx=' + path.join(tmp, 'absent.dc.jsx'), '--prefix=hero']);
   t('intake rejects a missing source', r.code === 2, r.out);
+  r = run(['intake', '--site=' + site, '--section=hero', '--prefix=hero']);
+  t('intake with NO source names both figma and url/html paths', r.code === 2 && /--dcjsx/.test(r.out) && /--extract/.test(r.out), r.out);
+  r = run(['intake', '--site=' + site, '--section=hero', '--prefix=hero', '--dcjsx=a.dc.jsx', '--extract=b.json']);
+  t('intake rejects two sources at once', r.code === 2, r.out);
+  // a real URL/HTML extract must compile end to end through the same command Figma uses
+  const ex = path.join(tmp, 'ex.json');
+  fs.writeFileSync(ex, JSON.stringify({ url: 'https://e.com/', viewport: { width: 1440 }, nodes: [
+    { tag: 'header', depth: 0, path: 'header', class: 'nav', box: { x: 0, y: 0, w: 1440, h: 80 }, styles: { display: 'flex', height: '80px' } },
+    { tag: 'span', depth: 1, path: 'header>span', class: 'nav__label', text: 'Products', box: { x: 10, y: 10, w: 60, h: 20 }, styles: { 'font-size': '14px' } },
+  ] }));
+  r = run(['intake', '--site=' + site, '--section=urlsec', '--prefix=nhp-urlsec', '--extract=' + ex]);
+  t('URL/HTML source compiles through wf-section intake (was Figma-only)', r.code === 0 && /source=url\/html/.test(r.out), r.out);
+  t('intake writes the content inventory for url/html', fs.existsSync(path.join(site, 'specs', 'urlsec.inventory.json')), r.out);
+  t('intake defaults to replica mode', /mode=replica/.test(r.out), r.out);
   r = run(['verify', '--site=' + site, '--section=hero', '--url=http://x', '--sel=.hero', '--no-contract', '--widths=']);
   t('verify surfaces a failing stage', r.code === 1, '');
   fs.rmSync(tmp, { recursive: true, force: true });
