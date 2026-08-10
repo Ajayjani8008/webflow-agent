@@ -186,3 +186,56 @@ v2.0's instruction split worked (always-injected 11,700 → 958 tokens) and ever
 **3, 4, 5 and 6 are one root cause: the build targeted the spec's numbers instead of the render's.** All four were measurable from the reference PNG at intake, with zero Webflow calls and zero publishes. Hence step 3b and the `--cause` gate.
 
 **The other lesson, and it is the expensive one:** at publish 2 the section scored **98.75% PASS, zero hot regions, a11y PASS, and `dom-contract` 158/158 property-equality PASS — with an entire text line missing.** Every automated gate was green. Only the mandatory anchor eye-view caught it. A percentage cannot see a 10px run, and property equality cannot see an element that renders empty. Keep the view; add the band.
+
+---
+
+## H. ASK ALMOST NEVER — deciding is the job (v2.1.13)
+
+The user hired the agent to turn a reference into Webflow. **Every question that the reference already answers
+is the agent handing its job back.** Measured cost of getting this wrong: a header build asked which content to
+use and then built 1.4% of its reference, because the menu it offered contained no option that meant "the
+reference".
+
+**In REPLICA mode the reference IS the answer.** Content, structure, depth, order, colour, type, spacing,
+breakpoint behaviour, how many panels, which items — all of it is IN the source. Asking is a process failure.
+**In ADAPT mode** the user's content is the answer for content only; every design decision is still the agent's.
+
+**The complete list of things worth interrupting a human for. Nothing else qualifies:**
+
+| Ask | Why it is genuinely theirs |
+|---|---|
+| Destroying or overwriting something the agent did not create — `remove_element` on an existing subtree, `unregister_component`, replacing a section, `POST /dom` | irreversible, no undo API, and it is their work |
+| Custom code (`html/css/js`) after the written `T1→T2→T3` descent proof | standing user rule; changes what the site is made of |
+| Publishing to a **production custom domain** | it goes live to their visitors |
+| A credential, token or paid external service | their money, their security |
+
+**CMS is INFORM, not ask.** Creating a collection, a field, or items to make the reference work is part of the
+build: say in one line what was created and carry on. Only *deleting* or *overwriting* existing CMS data is an ask.
+
+**Everything else: DECIDE → STATE IN ONE LINE → CONTINUE.** A missing value the source does not carry is a
+studio-quality judgement call, not a question: pick what a senior Webflow studio would ship, write it in the
+spec with `assumed:` next to it, and keep building. If the assumption turns out wrong the user says so, and one
+targeted fix is far cheaper than a stalled build.
+
+**Never ask a question whose options all abandon the reference.** If drafting a question produces no option
+meaning "match the reference exactly", the question itself is the bug.
+
+---
+
+## I. Command shape — so the user stops approving every call (v2.1.13)
+
+A permission rule matches a **literal prefix**. `Bash(node /abs/path/to/scripts/*)` covers the entire pipeline
+in ONE rule — but only if the command starts that way. These all MISS it and each one costs the user a prompt:
+
+    cd $WF/scripts && node wf-doctor.js          # compound: the rule sees `cd`
+    WF=~/docs/...; node $WF/scripts/wf-lint.js   # variable: no literal prefix
+    node ~/docs/memory/webflow/scripts/wf-lint.js   # tilde is not the literal path
+
+**So: invoke every pack script as one command, absolute path, nothing before it.**
+
+    node /Users/<you>/docs/memory/webflow/scripts/wf-doctor.js
+    node /Users/<you>/docs/memory/webflow/scripts/wf-section.js intake --site=… --section=…
+
+Resolve the absolute scripts path ONCE per session (`wf-doctor` prints it) and reuse it verbatim. Batch shell
+work into single calls for the same reason: 40 Bash calls is 40 approvals, and the user cannot see what any of
+them is for. One call that does the whole step, with its purpose in the message, is respectful of their time.

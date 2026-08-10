@@ -192,3 +192,26 @@ Root cause: every gate in this pack was advisory prose. Prose loses under contex
 (step 0) so the environment is never improvised, and `wf-section token` (step 4b) which must PRINT a token —
 target locked, spec + plan present, preflight passing right now, inventory present — before any MCP write is
 legal. Plus Never entries for `node -e` one-liners and for auditing the pack inside a build session.
+
+## 2026-08-07 — the agent asked for what the reference already answered, and the allowlist never matched
+
+Two separate causes of "I have to approve something every ten seconds".
+
+**Pack-level.** 14 ask-instructions lived in the skills, and most were design decisions: font family, brand
+hex codes, assets, what to do about an empty slot, which Interactions-panel wording, whether the user would
+confirm in the Designer. In REPLICA mode every one of those is IN the reference, so asking hands the job back.
+The worst case is measured: a header build offered a content menu in which no option meant "the reference", the
+user picked one, and the build shipped at 1.4%. New `webflow-core § H`: ask ONLY for (1) destroying/overwriting
+something the agent did not create, (2) custom code after the descent proof, (3) publishing to a production
+custom domain, (4) a credential or paid service. **CMS is inform, not ask.** Everything else: decide at studio
+quality, write `assumed:` in the spec, state it in one line, keep building. A question whose options all
+abandon the reference IS the bug.
+
+**Harness-level, and this was the real clicking.** `settings.local.json` held 331 allow rules and 249 of them
+were EXACT literal commands captured from past sessions (`Bash(node wf-resolve.js --site-id=… --cause="both
+mega panels…")`). An exact rule never matches the next command, so every Bash call prompted. Fix has two
+halves and neither works alone: prefix rules
+(`Bash(node /abs/path/to/scripts/*)`, plus the 3 MCP tools that were genuinely missing), AND `webflow-core § I`
+— invoke pack scripts as ONE command with an ABSOLUTE path, never `cd … && node x.js`, never `node $WF/…`,
+because a permission rule can only match a literal prefix. 40 Bash calls is 40 approvals the user cannot see
+the purpose of; batch them and say what the batch is for.

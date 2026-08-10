@@ -2,6 +2,45 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.13 — 2026-08-07
+
+"I have to approve something every ten seconds, I cannot see what for, and refusing derails the build."
+Two unrelated causes, both measured.
+
+**1. The agent asked for what the reference already answered.** 14 ask-instructions lived in the skills and
+most were design decisions: font family, brand hex codes, assets, empty-slot handling, Interactions-panel
+wording, "ask the user to confirm in Designer". In REPLICA mode every one of those is IN the source, so asking
+hands the job back to the person who delegated it — and the worst case is measured: a header build offered a
+content menu in which no option meant "the reference", and shipped at 1.4%.
+
+New **`webflow-core § H — ASK ALMOST NEVER`**. The complete list of what is worth interrupting a human for:
+destroying or overwriting something the agent did not create · custom code after the written descent proof ·
+publishing to a production custom domain · a credential or paid service. **CMS is INFORM, not ask** — creating
+a collection/field/items to make the reference work is part of the build; only deleting or overwriting existing
+data is an ask. Everything else: **DECIDE → STATE IN ONE LINE → CONTINUE**, with `assumed:` in the spec.
+And: never ask a question whose options all abandon the reference — the question is the bug.
+De-asked at source: `design-intake` (fonts/colours/assets/empty slots), `url-intake` (font install, inline SVG,
+and item 10, which still said "third-party reference → user supplies real content" — the exact sentence behind
+the 1.4% build), `motion-build` (panel labels: emit with canonical labels marked `labels:unverified`, correct
+only if the user reports a mismatch), `pixel-verify` (human confirmation is now last resort, never a substitute
+for a measurement).
+
+**2. The permission allowlist never matched anything.** `settings.local.json` held 331 allow rules, and 249 were
+EXACT literal commands captured from past sessions — `Bash(node wf-resolve.js --site-id=… --cause="both mega
+panels…")`. An exact rule cannot match the next command, so **every Bash call prompted**. Three MCP tools the
+pipeline calls were also genuinely absent. Fixed in two halves, because neither works alone:
+- `~/.claude/settings.json` gains intentional **prefix** rules — `Bash(node <abs>/scripts/*)`,
+  `Bash(bash <abs>/scripts/*)` — plus `data_element_settings_tool`, `data_component_builder`,
+  `data_component_props_tool`, `data_component_variants_tool`, `asset_tool`, `get_asset_preview`.
+  Nothing replaced; the existing keys and the 331 rules are untouched.
+- New **`webflow-core § I — command shape`**: invoke pack scripts as ONE command with an ABSOLUTE path.
+  `cd $WF/scripts && node x.js` and `node $WF/scripts/x.js` both MISS a prefix rule, and that is how nearly
+  every call in the 2026-08-07 sessions was shaped. Resolve the absolute path once per session and reuse it.
+  Batch shell work: 40 Bash calls is 40 approvals whose purpose the user cannot see.
+
+`wf-lint` 0/0. Not touched: the code-permission rule (the user's standing rule) and the
+destroy-needs-a-snapshot rule — those asks are the four that remain legitimate.
+
 ## v2.1.12 — 2026-08-07
 
 The screenshot source compiles. No hand work left on any reference type.

@@ -103,7 +103,7 @@ Extract measurable, flag rest with mandatory confidence:
 - **HIGH:** layout structure, column count, proportions, alignment, image boundaries
 - **MEDIUM:** sampled colors (JPEG ±5 shift — sample solid areas only, never anti-aliased edges/gradients), probable font family (compare a/g/y/R/Q shapes — never guess decorative), relative type scale
 - **LOW (can't know):** exact spacing px, weight/line-height/letter-spacing, hover/scroll behavior, breakpoints, borders <2px, shadow spread, small radii
-- **Ask user (required before build):** font family (validate in Webflow or user installs) · brand hex codes · high-res assets/logo SVG · interaction intent · breakpoints · section spacing intent
+- **Do NOT ask for these — take them from the source, and decide what it does not carry (webflow-core § H):** font family (read it from the design; if the family is not installable, substitute the nearest available, record `assumed:` and say so in one line) · brand hex codes (sample them from the render) · assets (export/download them). Only a CREDENTIAL or a paid font licence is the user's call. SVG · interaction intent · breakpoints · section spacing intent
 
 Every assumption tagged: `assuming 24px gap [MEDIUM]` → `unknowns`. **MEDIUM/LOW affecting layout = explicit user confirmation required**; text-only MEDIUM proceeds after one reminder. Image <1200px wide → ask higher res. Text in image → ask actual copy, don't OCR low-res. Gradients → ask tokens.
 
@@ -119,7 +119,7 @@ Full-source review, effect + library sweep, exact timing capture, reference run 
 
 Capture per section: every text node verbatim (incl. punctuation, casing, `&`/`—`, line breaks, superscripts) into the spec `elements:` rows · every image/icon exported and uploaded (never hotlink, never substitute) · alt text from the design/HTML, else a real description of that specific image.
 
-Source genuinely has no content for a slot (empty Figma placeholder, `TODO` in HTML) → ask once, list it in `unknowns`, and build only after the user supplies it or explicitly says "use placeholder here". Placeholder text the agent invented on its own = pixel-verify instant FAIL (pixel-verify § Content gate).
+Source genuinely has no content for a slot (empty Figma placeholder, `TODO` in HTML) → do NOT stall: omit the slot rather than invent copy, record it in `unknowns` with one line in the report, and keep building. A missing string is a content gap the user fills in seconds; a stalled build costs them the session.
 
 ## D. Assets — always
 

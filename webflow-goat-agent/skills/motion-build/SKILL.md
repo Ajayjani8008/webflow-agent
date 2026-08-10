@@ -58,9 +58,9 @@ IR is the single source of truth for build, verify and report.
 
 ### Panel detection (once per site, cached to `registry.md ## Motion-Panel`)
 
-Ask the user once, plainly: *"Does this site's Interactions panel show a horizontal timeline with ScrollTrigger / SplitText / Stagger controls (Interactions with GSAP), or the older action-list panel (Classic Interactions)?"* — one screenshot of the panel answers it. Cache the answer plus the exact control labels observed, and write build-scripts in that panel's vocabulary from then on. Unknown and user unreachable → write the script for Interactions with GSAP (current default) and note the assumption.
+Do NOT stall the build on this. Emit the build-script using the canonical labels, mark it `labels:unverified` in the ledger, and note in one line that the panel wording may differ by Webflow version. Ask ONLY if the user reports the labels do not match. (Previously: *"Does this site's Interactions panel show a horizontal timeline with ScrollTrigger / SplitText / Stagger controls (Interactions with GSAP), or the older action-list panel (Classic Interactions)?"* — one screenshot of the panel answers it. Cache the answer plus the exact control labels observed, and write build-scripts in that panel's vocabulary from then on. Unknown and user unreachable → write the script for Interactions with GSAP (current default) and note the assumption.
 
-**Never invent panel labels.** The Help Center pages are fetch-blocked (403), so the first time a build-script is needed, ask the user for one screenshot of the open panel, record the real control names in `## Motion-Panel`, and reuse them forever. A build-script with invented field names costs a round trip; one screenshot costs none.
+**Never invent panel labels.** The Help Center pages are fetch-blocked (403), so the labels cannot be verified from docs. Emit the script with canonical labels, mark it `labels:unverified`, and correct it only if the user reports a mismatch — never block the build on it. (Old behaviour: ask the user for one screenshot of the open panel, record the real control names in `## Motion-Panel`, and reuse them forever. A build-script with invented field names costs a round trip; one screenshot costs none.
 
 ## Phase 3 — Build
 

@@ -245,7 +245,7 @@ v1.11.0 claimed 5k-66k per PNG and rationed looking on that basis. That figure w
 
 So: **one reference view + one anchor comparison + images only on failures** = 2-4 views, ~6k tokens. Never skip a view the table asks for; never open one "to be sure" on a width that scored PASS — the measurement compared every pixel, the height and the per-region concentration, and it is stricter than the eye. The cost to control is turns and context, not images.
 
-**Human (secondary):** ask user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good."
+**Human (last resort only, and never as a substitute for a measurement):** if and only if a tool cannot reach the state, ask the user to confirm in Designer; mismatch → exact location → targeted diff on that element only (never full re-verify). No Designer open = unconfirmed, never accept bare "looks good."
 
 ## 4. Fix pass (batched, convergent)
 
