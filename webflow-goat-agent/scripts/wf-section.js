@@ -6,6 +6,7 @@
 // calling were already correct. What was missing is that each one had to be invoked, read and reasoned
 // about separately. This chains them:
 //
+//   token    refuses to bless a build until target+spec+plan+inventory exist and preflight passes NOW
 //   intake   ANY source -> plan + contract (+ content inventory) -> wf-preflight   (1 call, blocks a bad plan)
 //            figma:    figma-parse -> figma-compile
 //            url/html: url-compile -> content-coverage inventory
@@ -137,6 +138,67 @@ function intake() {
     console.log('  spec      NOT WRITTEN — write ' + spec + ' now (source structure · elements · effect manifest E1..En · responsive · open questions).');
     console.log('             The spec is the build contract; a later session resumes from it with zero history.');
   } else console.log('  spec      ' + spec);
+  process.exit(0);
+}
+
+
+// ── BUILD TOKEN ───────────────────────────────────────────────────────────────────────────────
+// Why this exists (measured, footer session 2026-08-07): 68 calls, 57 minutes, and NOT ONE pipeline
+// script ran — no wf-resolve, no intake, no preflight, no record. The section was hand-rolled with raw
+// MCP plus `node -e` one-liners, into a site with no state dir at all, borrowing another site's ref-cache.
+// Every gate in this pack was advisory prose, and prose loses under context pressure.
+//
+// So the readiness to build is now a THING YOU MUST PRODUCE, re-verified at the moment you ask:
+//   node wf-section.js token --site=<dir> --section=<name> [--source=figma|url|html|screenshot]
+// It prints BUILD-TOKEN only when the target is locked, the spec and plan exist, preflight passes RIGHT NOW,
+// and (for url/html) the content inventory exists. webflow-core forbids an MCP write without it.
+function token() {
+  const dir = siteDir();
+  const section = opt('section') || die('--section=<name> is required');
+  const source = (opt('source') || 'url').toLowerCase();
+  const st = readJSON(path.join(dir, 'build_state.json')) || {};
+  const specs = path.join(dir, 'specs');
+  const spec = path.join(specs, section + '.md');
+  const plan = path.join(specs, section + '.plan.json');
+  const inv = path.join(specs, section + '.inventory.json');
+  const fails = [], warns = [];
+
+  if (!(st.site && st.site.site_id)) fails.push('build_state.site.site_id is empty — run wf-resolve.js --site-id=<id> --slug=<shortName> first. Building into a site with no recorded id is how a footer landed on an untracked site on 2026-08-07');
+  if (!(st.page && st.page.page_id)) fails.push('no page lock in build_state — wf-resolve.js --page=<id> locks the target (Rule 6: build where the user is)');
+  if (!fs.existsSync(spec)) fails.push('spec missing: ' + spec + ' — the spec IS the build contract; a cold session resumes from it');
+  if (!fs.existsSync(plan)) fails.push('plan missing: ' + plan + ' — run `wf-section.js intake` (it compiles the plan; hand-authoring one is what cost 204 calls)');
+  if (source !== 'figma' && source !== 'screenshot' && !fs.existsSync(inv)) {
+    fails.push('content inventory missing: ' + inv + ' — without it no gate can tell a replica from substituted content (step 6b)');
+  }
+
+  let pf = null;
+  if (fs.existsSync(plan)) {
+    pf = stage('preflight', 'wf-preflight.js', [plan,
+      ...(opt('site-prefix') ? ['--site-prefix=' + opt('site-prefix')] : (st.site && st.site.id ? ['--site-prefix=' + st.site.id] : [])),
+      ...(opt('known-prefixes') ? ['--known-prefixes=' + opt('known-prefixes')] : [])]);
+    if (pf.code !== 0) fails.push('preflight does NOT pass on the current plan — fix the plan, not the build');
+  }
+
+  for (const sec of (st.sections || [])) {
+    if (sec.name !== section && sec.status === 'in-progress' && !sec.cost) {
+      warns.push(`section "${sec.name}" is in-progress with no recorded cost — either unbuilt or built-and-never-recorded. Reconcile it, or the state keeps lying`);
+    }
+  }
+
+  console.log('EVIDENCE wf-section token  section=' + section + '  source=' + source);
+  for (const w of warns) console.log('  warn  ' + w);
+  if (fails.length) {
+    for (const f of fails) console.log('  FAIL  ' + f);
+    console.log('  NO BUILD TOKEN — an MCP write now is a process failure, not a shortcut.');
+    process.exit(1);
+  }
+  const stamp = [st.site.site_id, st.page.page_id, section, String(fs.statSync(plan).mtimeMs | 0)].join(':');
+  let h = 0; for (const ch of stamp) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  console.log('  site      ' + st.site.site_id + '   page ' + st.page.page_id);
+  console.log('  spec      ' + spec);
+  console.log('  plan      ' + plan + '   preflight PASS');
+  if (fs.existsSync(inv)) console.log('  inventory ' + inv);
+  console.log('  BUILD-TOKEN ' + Math.abs(h).toString(36) + '   valid for this section while the plan is unchanged');
   process.exit(0);
 }
 
@@ -334,6 +396,26 @@ function selfTest() {
   t('missing site dir rejected', r.code === 2, r.out);
   r = run(['intake', '--site=' + site, '--section=hero', '--dcjsx=' + path.join(tmp, 'absent.dc.jsx'), '--prefix=hero']);
   t('intake rejects a missing source', r.code === 2, r.out);
+  // ── build-token gate: readiness must be produced, not assumed ──
+  r = run(['token', '--site=' + site, '--section=nope']);
+  t('token refuses when spec+plan are absent', r.code === 1 && /NO BUILD TOKEN/.test(r.out), r.out);
+  const st0 = JSON.parse(fs.readFileSync(path.join(site, 'build_state.json'), 'utf8'));
+  st0.site = { id: 'demo-site', name: 'demo', site_id: '' }; st0.page = { page_id: 'P1' };
+  fs.writeFileSync(path.join(site, 'build_state.json'), JSON.stringify(st0));
+  r = run(['token', '--site=' + site, '--section=nope']);
+  t('token names an empty site_id as the blocker', /site_id is empty/.test(r.out), r.out);
+  st0.site.site_id = 'S1'; fs.writeFileSync(path.join(site, 'build_state.json'), JSON.stringify(st0));
+  fs.mkdirSync(path.join(site, 'specs'), { recursive: true });
+  fs.writeFileSync(path.join(site, 'specs', 'tok.md'), '# spec');
+  fs.writeFileSync(path.join(site, 'specs', 'tok.plan.json'), JSON.stringify({ section: 'tok', classes: [], tree: { type: 'DivBlock', styleNames: ['demo-site__row'] } }));
+  r = run(['token', '--site=' + site, '--section=tok', '--source=url']);
+  t('token still refuses without a content inventory (url source)', r.code === 1 && /inventory missing/.test(r.out), r.out);
+  fs.writeFileSync(path.join(site, 'specs', 'tok.inventory.json'), JSON.stringify({ strings: [], structure: {}, counts: { strings: 0, groups: 0 } }));
+  r = run(['token', '--site=' + site, '--section=tok', '--source=url']);
+  t('token issues BUILD-TOKEN when target+spec+plan+inventory+preflight all hold', r.code === 0 && /BUILD-TOKEN /.test(r.out), r.out);
+  r = run(['token', '--site=' + site, '--section=tok', '--source=figma']);
+  t('figma source needs no content inventory', r.code === 0, r.out);
+
   r = run(['intake', '--site=' + site, '--section=hero', '--prefix=hero']);
   t('intake with NO source names both figma and url/html paths', r.code === 2 && /--dcjsx/.test(r.out) && /--extract/.test(r.out), r.out);
   r = run(['intake', '--site=' + site, '--section=hero', '--prefix=hero', '--dcjsx=a.dc.jsx', '--extract=b.json']);
@@ -356,7 +438,8 @@ function selfTest() {
 
 if (flag('self-test')) selfTest();
 else if (cmd === 'intake') intake();
+else if (cmd === 'token') token();
 else if (cmd === 'verify') verify();
 else if (cmd === 'record') record();
 else if (cmd === 'assets') assets();
-else die('usage: node wf-section.js <intake|verify|record> --site=<dir> --section=<name> …   |   --self-test');
+else die('usage: node wf-section.js <intake|token|verify|record> --site=<dir> --section=<name> …   |   --self-test');

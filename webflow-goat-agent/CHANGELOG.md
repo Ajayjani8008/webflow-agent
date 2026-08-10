@@ -2,6 +2,35 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.9 — 2026-08-07
+
+Diagnosed the footer that cost 68 calls and 57 minutes. The count was not the finding: **no pipeline script
+ran at all.**
+
+Measured (`wf-report --session=`): 155 turns · 68 calls · 57 min · peak 321k · 1.4M new tokens, for one footer.
+Call budget: **18** pack self-audit before any work (`git log`, file-size census, skills token estimates,
+playwright probe, `npm install`) · **7** ad-hoc `node -e` one-liners against a cached extract that `url-compile`
+reads in ONE call · **12** scratchpad write/patch cycles · **9** post-build element patches because the plan was
+incomplete · **3** style batches where the rule says one · **2+** environment workarounds. ~50 of 68 avoidable.
+
+And the state layer was bypassed entirely: the footer was built into `covilla-page-design`, a site with **no
+state dir**, using another site's `ref-cache`, and never recorded — so `build_state` claims that footer is
+`in-progress, cost null` on a site where it does not exist, while 69 real links sit live somewhere else.
+
+Root cause: **every gate was advisory prose, and prose loses under context pressure.** Two mechanical gates:
+
+- **`wf-doctor.js` (pipeline step 0, once per session)** — pipeline scripts present · node deps resolvable FROM
+  the scripts dir (the thing `NODE_PATH=$(…)` prefixes were papering over) · headless Chrome · state root · and
+  **state drift**: any section marked `in-progress` with no recorded cost, meaning it was either never built or
+  built and never recorded. First run on the live install found both real drifts immediately.
+- **`wf-section token` (step 4b)** — readiness must be PRODUCED, not assumed. Prints `BUILD-TOKEN` only when the
+  site_id and page are locked, the spec and plan exist, **preflight passes right now**, and (url/html) the
+  content inventory exists. `webflow-core`: no `data_element_builder` or `data_style_tool` write is legal without
+  a fresh token line for that section. 6 new self-tests (18 total in `wf-section`).
+- Never list gained the two habits that ate 25 calls: an ad-hoc `node -e` against a cache or capture (if a named
+  script cannot answer it, add a **flag** to that script — a one-liner is thrown away and paid for again next
+  session), and auditing or refactoring the pack inside a build session.
+
 ## v2.1.8 — 2026-08-07
 
 `url-compile` was written against ONE reference site's conventions. Caught by the user, proven with two

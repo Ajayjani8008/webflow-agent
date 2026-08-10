@@ -172,3 +172,23 @@ Three times in one session a fix was scoped to the instance in front of the agen
 The test that catches all three, and it is cheap: **before claiming a fix is general, run it on an input shaped
 deliberately unlike the one that prompted it**, and grep whether anything in the pipeline actually CALLS the new
 code. Existence is not reachability.
+
+## 2026-08-07 — the footer that cost 68 calls: the pipeline was never invoked
+
+Measured from the transcript (`wf-report --session=`): 155 turns, 68 tool calls, 57 min, peak 321k, 1.4M new
+tokens — for one footer. Where the calls went: **18** pack self-audit before any work (`git log`, file-size
+census, skills token estimates, playwright probe, `npm install`) · **7** ad-hoc `node -e` one-liners against a
+cached extract that `url-compile` reads in one call · **12** scratchpad file writes/patches · **9** post-build
+element patches because the plan was incomplete · **3** style batches where the rule says one · **2+**
+environment workarounds (`npm install` mid-flight, `NODE_PATH=$(…)`, inline `sleep 20`). ~50 of 68 avoidable.
+
+The structural finding is worse than the count: **no pipeline script ran at all** — no `wf-resolve`, no
+`wf-section intake`, no `wf-preflight`, no `record`. The section was built into `covilla-page-design`, a site
+with **no state dir**, using `new-hive-pro-design`'s ref-cache, and was never recorded — so `build_state` still
+says that footer is `in-progress, cost null` on a site where it does not exist, while 69 real links sit live on
+another site.
+
+Root cause: every gate in this pack was advisory prose. Prose loses under context pressure. Fixes: `wf-doctor.js`
+(step 0) so the environment is never improvised, and `wf-section token` (step 4b) which must PRINT a token —
+target locked, spec + plan present, preflight passing right now, inventory present — before any MCP write is
+legal. Plus Never entries for `node -e` one-liners and for auditing the pack inside a build session.
