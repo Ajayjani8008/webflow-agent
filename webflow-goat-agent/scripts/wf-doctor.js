@@ -23,7 +23,8 @@ const checks = []; const add = (name, ok, detail, fatal = true) => checks.push({
 const NEEDED = ['wf-resolve.js', 'wf-section.js', 'wf-preflight.js', 'url-compile.js', 'content-coverage.js',
   'verify-section.js', 'dom-contract.js', 'pixel-diff.js', 'page-audit.js', 'ref-extract.js', 'shot.js',
   'shot-el.js', 'state-shot.js', 'text-extents.js', 'ref-digest.js', 'ref-integrity.js', 'motion-verify.js',
-  'wf-report.js', 'figma-parse.js', 'figma-compile.js', 'skeletons.json'];
+  'wf-report.js', 'figma-parse.js', 'figma-compile.js', 'skeletons.json',
+  'plan-diff.js', 'shot-compile.js', 'wf-ocr.swift', 'wf-doctor.js'];
 const missing = NEEDED.filter(f => !fs.existsSync(path.join(SCRIPTS, f)));
 add('pipeline scripts present', missing.length === 0, missing.length ? 'missing: ' + missing.join(', ') : `${NEEDED.length} present`);
 
@@ -49,6 +50,18 @@ const CHROME = process.platform === 'darwin' ? '/Applications/Google Chrome.app/
 let chromeOk = fs.existsSync(CHROME);
 if (!chromeOk && process.platform === 'linux') chromeOk = spawnSync('which', ['google-chrome'], { encoding: 'utf8' }).status === 0;
 add('headless Chrome', chromeOk, chromeOk ? CHROME : 'not found — shot/verify/page-audit/state-shot all fail without it');
+
+// ---- 3b. OCR for the screenshot source (compiled on demand, cached; nothing to install on macOS)
+if (process.platform === 'darwin') {
+  const swiftc = spawnSync('swiftc', ['--version'], { encoding: 'utf8' }).status === 0;
+  const cached = fs.existsSync(path.join(SCRIPTS, '.cache', 'wf-ocr'));
+  add('OCR for screenshots (macOS Vision)', swiftc || cached,
+    cached ? 'helper already built (.cache/wf-ocr)' : (swiftc ? 'swiftc present — shot-compile builds the helper on first use'
+      : 'no swiftc: run `xcode-select --install`, else a screenshot source cannot be compiled'), false);
+} else {
+  const tess = spawnSync('tesseract', ['--version'], { encoding: 'utf8' }).status === 0;
+  add('OCR for screenshots (tesseract)', tess, tess ? 'tesseract present' : 'install tesseract, else a screenshot source cannot be compiled', false);
+}
 
 // ---- 4. state root
 add('state root exists', fs.existsSync(path.join(WF, 'sites')), path.join(WF, 'sites'));

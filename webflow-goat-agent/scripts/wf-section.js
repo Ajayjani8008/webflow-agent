@@ -17,6 +17,7 @@
 //   node wf-section.js intake --site=<dir> --section=<name> --prefix=<block>
 //                             --dcjsx=<node.dc.jsx>        # figma
 //                             | --extract=<capture.json>   # url or html delivery
+//                             | --screenshot=<image.png>   # screenshot (OCR + measured pixels)
 //                             [--mode=replica|adapt] [--font=X] [--root=<nodeId>] [--section-tag]
 //                             [--site-prefix=<id>] [--known-prefixes=a,b]
 //   node wf-section.js verify --site=<dir> --section=<name> --url=<published> --sel="<css>"
@@ -84,11 +85,14 @@ function intake() {
   //   --dcjsx=<file>          figma  -> figma-parse -> figma-compile
   //   --extract=<file>        url/html -> url-compile (a ref-extract capture; html-intake produces the
   //                           same shape by running the delivery through ref-extract on a file:// URL)
-  const dcjsx = opt('dcjsx'), extract = opt('extract');
-  if (!dcjsx && !extract) die('give the source: --dcjsx=<node.dc.jsx> (figma) or --extract=<ref-extract.json> (url/html).\n' +
-    '  A screenshot source has no machine capture — write the spec by hand and run wf-preflight on the plan yourself.');
-  if (dcjsx && extract) die('pass ONE source, not both — hybrid sources declare roles in the spec (webflow-core § C).');
-  const src = dcjsx || extract;
+  const dcjsx = opt('dcjsx'), extract = opt('extract'), shot = opt('screenshot');
+  const given = [dcjsx, extract, shot].filter(Boolean);
+  if (!given.length) die('give the source:\n' +
+    '    --dcjsx=<node.dc.jsx>        figma      -> figma-parse -> figma-compile\n' +
+    '    --extract=<capture.json>     url/html   -> url-compile\n' +
+    '    --screenshot=<image.png>     screenshot -> shot-compile (OCR + measured pixels; v2.1.12)');
+  if (given.length > 1) die('pass ONE source, not several — hybrid sources declare roles in the spec (webflow-core § C).');
+  const src = dcjsx || extract || shot;
   if (!fs.existsSync(src)) die('not found: ' + src);
 
   const mode = (opt('mode') || 'replica').toLowerCase();
@@ -100,7 +104,7 @@ function intake() {
   const contract = path.join(dir, 'specs', section + '.contract.json');
   const inventory = path.join(dir, 'specs', section + '.inventory.json');
 
-  console.log('EVIDENCE wf-section intake  section=' + section + '  source=' + (dcjsx ? 'figma' : 'url/html') + '  mode=' + mode);
+  console.log('EVIDENCE wf-section intake  section=' + section + '  source=' + (dcjsx ? 'figma' : shot ? 'screenshot' : 'url/html') + '  mode=' + mode);
   let r;
   if (dcjsx) {
     r = stage('parse', 'figma-parse.js', [dcjsx, '--out=' + parsed]);
@@ -115,6 +119,19 @@ function intake() {
     r = stage('inventory', 'content-coverage.js', ['inventory', parsed, inventory]);
     if (r.code !== 0) { console.log('  FAIL  content-coverage inventory'); process.exit(1); }
     console.log('  inventory ' + inventory + '   <- step 6b verifies the published page against this, --mode=' + mode);
+  } else if (shot) {
+    // A screenshot compiles too (v2.1.12): OCR for the strings + boxes, pixels for colours, backgrounds,
+    // gaps and filled-button detection. It writes its own inventory, so this source is no longer hand work.
+    const cargs = [shot, '--prefix=' + prefix, '--section=' + section, '--out-plan=' + plan,
+      '--out-contract=' + contract, '--out-inventory=' + inventory];
+    if (opt('font')) cargs.push('--font=' + opt('font'));
+    if (opt('dpr')) cargs.push('--dpr=' + opt('dpr'));
+    r = stage('compile', 'shot-compile.js', cargs);
+    if (r.code !== 0) { console.log('  FAIL  shot-compile'); process.exit(1); }
+    console.log('  inventory ' + inventory + '   <- from OCR; step 6b verifies the published page against it');
+    console.log('  NOTE      font SIZE is an estimate from cap-height — step 3c (text-extents check-spec) is NOT optional');
+    console.log('            for this source, and behaviour parity is impossible from a still: ask for a URL/HTML');
+    console.log('            reference or a recording before claiming any hover/scroll/load state.');
   } else {
     const cargs = [extract, '--prefix=' + prefix, '--section=' + section, '--out-plan=' + plan, '--out-contract=' + contract];
     if (opt('font')) cargs.push('--font=' + opt('font'));

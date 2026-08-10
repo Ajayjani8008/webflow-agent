@@ -2,6 +2,39 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.12 — 2026-08-07
+
+The screenshot source compiles. No hand work left on any reference type.
+
+`figma -> figma-compile`, `url/html -> url-compile`, `screenshot -> nothing` was the last asymmetry: the one
+source with no machine capture was the one where the plan, the values AND the string inventory were all
+hand-authored — the exact condition that produced a 204-call, 1.4%-accurate header.
+
+**`shot-compile.js`** — a PNG has no DOM, but it is not opaque:
+- **Strings come from real OCR, with boxes.** macOS Vision via a 40-line Swift helper (`wf-ocr.swift`)
+  compiled on demand into `scripts/.cache/` — nothing to install, no network. `tesseract` is the portable
+  fallback; without either it refuses and says asking for a URL/HTML reference is better input anyway.
+  Measured on a real header shot: 6/6 runs at **confidence 1.00**.
+- **Values come from pixels.** Text colour sampled from its own ink against its local background · page
+  background as the modal colour · padding from ink extents · gaps from the within-row rhythm · **filled
+  buttons detected** because a pill's local background differs from the page's (found the CTA correctly).
+- **Structure from geometry.** Runs cluster into rows by baseline overlap, then into groups by gap. The gap
+  base is the **25th percentile, never the median** — with three clusters the median gap IS a between-cluster
+  gap, so a median-based cut exceeded every real gap and never split the row (its own self-test caught that).
+  On the real header it recovers exactly the reference's three clusters: brand | 3 nav items | login + CTA.
+- **OCR artefacts handled structurally, not by a glyph list.** Vision returned `"V"` for one chevron and the
+  CJK `"く"` for the next one in the same image, so enumerating glyphs is hopeless: a trailing
+  single-character token in a UI label is an icon (digits kept, so "Step 2" survives), and a 1-2 char leading
+  token before a long word is a logo mark. Every strip is printed, never silent.
+- **Provenance is emitted with the plan**: what was MEASURED, what is ESTIMATED (font size, ±1px from
+  cap-height — so step 3c `text-extents check-spec` is mandatory for this source), and what is NOT KNOWABLE
+  (font family; and states, which a still cannot contain — behaviour parity must never be claimed from an image).
+- It writes its own **content inventory**, so step 6b guards a screenshot build like any other.
+
+Wired: `wf-section intake --screenshot=<png>` is the third branch of the one intake command · `wf-doctor`
+checks OCR readiness so a build never discovers it mid-flight · `webflow-core` source table updated.
+9 self-tests. The generated plan preflights **CLEAN** on a real screenshot.
+
 ## v2.1.11 — 2026-08-07
 
 Two ways a wrong build could still pass every gate. Both closed, both with the failing case as a test.
