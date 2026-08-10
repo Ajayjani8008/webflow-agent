@@ -10,7 +10,7 @@
 //   intake   ANY source -> plan + contract (+ content inventory) -> wf-preflight   (1 call, blocks a bad plan)
 //            figma:    figma-parse -> figma-compile
 //            url/html: url-compile -> content-coverage inventory
-//   verify   verify-section -> dom-contract                          (1 call, one EVIDENCE set)
+//   verify   verify-section -> dom-contract -> plan-diff              (1 call, one EVIDENCE set)
 //   record   build_state + registry + spec status                    (1 call, one write pass)
 //
 // Usage:
@@ -20,7 +20,8 @@
 //                             [--mode=replica|adapt] [--font=X] [--root=<nodeId>] [--section-tag]
 //                             [--site-prefix=<id>] [--known-prefixes=a,b]
 //   node wf-section.js verify --site=<dir> --section=<name> --url=<published> --sel="<css>"
-//                             [--widths=1440,991,767,390] [--ref=<dir>] [--states=base,auto]
+//                             [--widths=1440,991,767,390] [--ref=<dir>|auto] [--unscored-ok=767,390 --unscored-reason="…"]
+//                             [--states=base,auto] [--no-plan-diff]
 //                             [--audit] [--width=1920] [--no-contract]
 //   node wf-section.js assets --site=<dir> --put="name=id,name=id"   |   --get=name1,name2   |   --list
 //        The site's asset-id map, cached in build_state.assets. list_assets returns every asset on the
@@ -222,7 +223,24 @@ function verify() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const vargs = [url, sel, outDir, '--section=' + section, '--widths=' + opt('widths', '1440,991,767,390')];
-  if (opt('ref')) vargs.push('--ref=' + opt('ref'));
+  // AUTO-DISCOVER the reference shots (v2.1.11). verify-section now refuses to print PASS with nothing
+  // scored, and the flag it needs was the one easiest to forget: a header was reported PASS/"NOT scored"
+  // because --ref was never passed. Look where every intake puts them before asking the caller to remember.
+  let ref = opt('ref');
+  if (!ref) {
+    const cands = [];
+    const rc = path.join(dir, 'ref-cache');
+    if (fs.existsSync(rc)) for (const d of fs.readdirSync(rc)) cands.push(path.join(rc, d, 'shots'));
+    cands.push(path.join(dir, 'figma-cache', '04-screenshots'), path.join(dir, 'specs', 'shots'));
+    ref = cands.find(c => fs.existsSync(c) && fs.readdirSync(c).some(f => f.startsWith(section) && f.endsWith('.png')))
+       || cands.find(c => fs.existsSync(c) && fs.readdirSync(c).some(f => f.endsWith('.png')));
+    if (ref) console.log('  ref       ' + ref + '   (auto-discovered; pass --ref to override)');
+    else console.log('  ref       NONE FOUND — verify-section will refuse to report PASS. Capture reference shots, or\n' +
+                     '            declare the absence: --unscored-ok=<widths> --unscored-reason="<why>" (Rule G)');
+  }
+  if (ref) vargs.push('--ref=' + ref);
+  if (opt('unscored-ok')) vargs.push('--unscored-ok=' + opt('unscored-ok'));
+  if (opt('unscored-reason')) vargs.push('--unscored-reason=' + opt('unscored-reason'));
   if (opt('states')) vargs.push('--states=' + opt('states'));
   if (flag('audit') || !flag('no-audit')) vargs.push('--audit');
 
@@ -241,7 +259,18 @@ function verify() {
     }
   }
 
-  const pass = v.code === 0 && c.code === 0;
+  // plan-diff: every other gate verifies what EXISTS, so a build that is a subset of its plan passes them
+  // all. Measured 2026-08-07: a 582-node plan shipped as 25 divs / 16 links — 2.7% of its classes — with
+  // property equality and a11y both green. This is the only gate that sees that.
+  let pd = { code: 0, skipped: true };
+  const planPath = opt('plan', path.join(dir, 'specs', section + '.plan.json'));
+  if (!flag('no-plan-diff')) {
+    if (fs.existsSync(planPath)) pd = stage('plan-diff', 'plan-diff.js', ['verify', planPath, url,
+      '--min-class=' + opt('min-class', '100'), '--min-string=' + opt('min-string', '100')]);
+    else console.log('  WARN  no plan at ' + planPath + ' — structural omission cannot be detected without one (run intake).');
+  }
+
+  const pass = v.code === 0 && c.code === 0 && pd.code === 0;
 
   // Progress ledger (v2.1): a verify that reproduces the previous verdict AND score closed nothing.
   // Two of those is STALLED — pixel-verify has always said so; this makes it checkable in code.

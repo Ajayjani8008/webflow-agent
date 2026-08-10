@@ -2,6 +2,28 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.11 — 2026-08-07
+
+Two ways a wrong build could still pass every gate. Both closed, both with the failing case as a test.
+
+- **`verify-section` printed `PASS` while scoring nothing.** A missing `--ref` was a *warning*; the verdict was
+  computed only from failures, so "PASS … shots captured but NOT scored" was printable — and that is the exact
+  line that accompanied a header matching its reference at 1.4%. Now: no reference means verdict
+  **UNVERIFIED** (exit 1), and a per-width UNSCORED must be **declared** — `--unscored-ok=<widths>
+  --unscored-reason="<why the source has no frame>"` — so Rule G's legitimate case stays legitimate while
+  silence becomes a failure. `PASS` is now impossible unless something was actually measured.
+- **Nothing compared the build against its plan.** Every gate verifies what EXISTS: property equality checks
+  the classes you created, the pixel score compares the region you captured, a11y walks the DOM you shipped.
+  A build that is a SUBSET of its plan passes all of them. New **`plan-diff.js`** compares the compiled plan to
+  the published markup — classes, strings, and a per-tag structural deficit. Run against the live page with the
+  582-node replica plan it reports: **classes 3/111 (2.7%) · strings 2/138 (1.4%) · `<div>` plan 238 built 25 ·
+  `<a>` plan 120 built 16**. Surplus wrappers (Webflow adds its own) never fail it; only a deficit does.
+  6 self-tests including a subset build, and the failure names the missing classes and strings.
+- **`wf-section verify` now auto-discovers the reference shots** (ref-cache/*/shots, figma-cache screenshots)
+  and chains `verify-section → dom-contract → plan-diff`. The flag that was easiest to forget is no longer the
+  one holding the accuracy gate up.
+- Pipeline gains step 6c; the Never list gains "calling a section verified when nothing was scored".
+
 ## v2.1.10 — 2026-08-07
 
 Audited v2.1.3-v2.1.9 against the actual goal — **any reference (Figma / live URL / HTML / React app /

@@ -33,13 +33,17 @@ const flag = (n, d) => { const f = args.find(x => x === `--${n}` || x.startsWith
 const [url, sel, outDir] = pos;
 if (args.includes('--self-test')) { selfTest(); }
 if (!url || !sel || !outDir) {
-  console.error('usage: node verify-section.js <url> <selector> <outDir> [--section= --widths= --ref= --states= --audit --min= --cell= --height= --json]   |   --self-test');
+  console.error('usage: node verify-section.js <url> <selector> <outDir> [--section= --widths= --ref= --unscored-ok=767,390 --unscored-reason="…" --states= --audit --min= --cell= --height= --json]   |   --self-test');
   process.exit(2);
 }
 const section = flag('section', sel.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'section');
 const widths = String(flag('widths', '1440,991,767,390')).split(',').map(Number).filter(Boolean);
 const mobileSet = new Set(String(flag('mobile', '767,390')).split(',').map(Number));
 const refDir = flag('ref', null);
+// Rule G: an absent reference frame is legitimate, but it must be DECLARED with a reason, never discovered
+// silently. Undeclared UNSCORED is a fail, so "PASS (unscored)" can no longer be printed.
+const unscoredOk = String(flag('unscored-ok', '') || '').split(',').map(Number).filter(Boolean);
+const unscoredReason = flag('unscored-reason', null) || 'no reason given';
 const states = flag('states', null);
 const doAudit = !!flag('audit', false);
 const MIN = flag('min', '97'), CELL = flag('cell', '25'), HEIGHT = flag('height', '2');
@@ -72,7 +76,10 @@ function selfTest() {
   // a dark bar with a small light wordmark: ~2% of pixels, and it compresses to a few KB
   const flatBar = write('flat-bar.png', 1440, 72, (x, y) => (y > 24 && y < 48 && x > 40 && x < 200) ? [255, 255, 255] : BG);
   let ok = true;
+  // a verdict of PASS with nothing measured was the contradiction that let a 1.4% header through
+  const noRef = require('child_process').spawnSync(process.execPath, [__filename, 'file:///dev/null', 'body', tmp, '--widths=1440'], { encoding: 'utf8' });
   const cases = [
+    ['no --ref can never print PASS', /VERDICT: (FAIL|UNVERIFIED)/.test((noRef.stdout || '') + (noRef.stderr || '')) || noRef.status !== 0, true],
     ['uniform PNG reads blank', inkRatio(uniform) < 0.001, true],
     ['flat real bar does NOT read blank', inkRatio(flatBar) < 0.001, false],
     ['old byte rule would have failed the real bar', fs.statSync(flatBar).size < 7000, true],
@@ -183,14 +190,22 @@ async function captureAll() {
       if (s.error || s.blank) continue;
       const cands = [path.join(refDir, `${section}-${s.width}.png`), path.join(refDir, `${section}--${s.width}.png`), path.join(refDir, `${section}.png`)];
       const ref = cands.find(fs.existsSync);
-      if (!ref) { report.scores.push({ width: s.width, verdict: 'UNSCORED', reason: `no reference (looked for ${section}-${s.width}.png)` }); report.warns.push(`@${s.width} UNSCORED — no reference frame; derived values, state it in the report`); continue }
+      if (!ref) {
+        report.scores.push({ width: s.width, verdict: 'UNSCORED', reason: `no reference (looked for ${section}-${s.width}.png)` });
+        if (unscoredOk.includes(s.width)) report.warns.push(`@${s.width} UNSCORED (declared): ${unscoredReason} — invariants only, never reported as a score`);
+        else report.fails.push(`@${s.width} UNSCORED and NOT declared — either supply ${section}-${s.width}.png or declare it: --unscored-ok=${s.width} --unscored-reason="the source has no frame at this width" (Rule G)`);
+        continue;
+      }
       const r = await run('pixel-diff.js', [ref, s.file, path.join(outDir, `${section}-${s.width}-diff.png`), '--json', `--min=${MIN}`, `--cell=${CELL}`, `--height=${HEIGHT}`]);
       let j = null; try { j = JSON.parse(r.out) } catch (e) {}
       if (!j) { report.scores.push({ width: s.width, verdict: 'ERROR', reason: r.err || 'pixel-diff produced no JSON' }); report.fails.push(`@${s.width} score could not be computed: ${r.err || 'no output'}`); continue }
       report.scores.push({ width: s.width, verdict: j.verdict, match: j.match, heightDeltaPct: j.heightDeltaPct, hotCells: j.hotCells, worst: j.worst, ref, fails: j.fails });
       j.fails.forEach(f => report.fails.push(`@${s.width} ${f}`));
     }
-  } else report.warns.push('no --ref given: shots captured but NOT scored — this is not a verified section');
+  } else report.fails.push('no --ref given: shots were captured but NOTHING was scored. A section cannot be ' +
+    'verified without a comparison — this used to be a warning while the verdict still read PASS, which is how ' +
+    'a header shipped at 1.4% of its reference (v2.1.11). Pass --ref=<dir of reference shots>, or declare the ' +
+    'absence explicitly with --unscored-ok=<widths> --unscored-reason="<why the reference has no such frame>".');
 
   // ---------- a11y + perf ----------
   if (doAudit) {
@@ -217,7 +232,9 @@ async function captureAll() {
     }
   }
 
-  report.verdict = report.fails.length ? 'FAIL' : 'PASS';
+  const measured = report.scores.some(x => x.verdict === 'PASS' || x.verdict === 'FAIL');
+  report.verdict = report.fails.length ? 'FAIL' : (measured ? 'PASS' : 'UNVERIFIED');
+  if (report.verdict === 'UNVERIFIED') report.fails.push('nothing was scored at any width — UNVERIFIED is not PASS');
   const jsonPath = path.join(outDir, `${section}-verify.json`);
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
