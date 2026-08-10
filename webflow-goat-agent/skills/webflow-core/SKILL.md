@@ -101,9 +101,10 @@ Never claim a capability is missing from memory or a cached tool listing — `ge
 |---|---|
 | Figma, first time | `figma-setup` (scoped) → build from `figma-cache/` |
 | Figma, cached | `figma-cache/` → instant. A second fetch of a cached node is a bug |
-| Screenshot | `design-intake` §B → confidence levels → user sign-off |
+| Screenshot | `design-intake` §B → confidence levels → user sign-off. **The one source with no machine capture**, so there is no compiler and no automatic inventory: TRANSCRIBE every visible string into `specs/<section>.inventory.json` by hand — `wf-section token` refuses the build without it. Same gate as every other source; only its origin is manual |
 | HTML delivery | `html-intake` — every html/css/js read end to end, run headless, manifest with exact timings |
 | Live URL | `url-intake` → `ref-cache/{domain}/`. Third-party → layout/patterns only, never brand assets or copy |
+| **React / Vue / SPA / Storybook** (localhost or deployed) | it is a live URL: `url-intake` → `ref-extract` (waits for hydration) → the SAME `--extract` intake. Hashed/utility class names are expected and handled — class identity comes from role + style fingerprint, never the framework's generated names |
 | Text description | draft spec → confirm → build |
 | Animation | `motion-build` → Motion IR → native tier route → `motion-verify.js` proof |
 | Cross-site reuse | `portable-mode` (confirm once) |

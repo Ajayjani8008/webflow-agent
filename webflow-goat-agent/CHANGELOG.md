@@ -2,6 +2,30 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.10 — 2026-08-07
+
+Audited v2.1.3-v2.1.9 against the actual goal — **any reference (Figma / live URL / HTML / React app /
+screenshot) → native Webflow, on any site** — instead of against the site that surfaced the bugs. The logic
+held; three source-specific gaps and one unproven claim did not.
+
+- **The content gate was URL/HTML-only, so Figma copy could be substituted undetected.** `figma-parse` emits
+  `nodes[].text` and `content-coverage` already reads that shape — it was simply never wired. Now `intake`
+  writes an inventory for **figma too**, and `token` requires one for **every** source. A screenshot has no
+  machine capture, so it is told to TRANSCRIBE its strings into the same file rather than being exempted:
+  the one source without a gate is the one where substituted content ships.
+- **The HTML route was asserted, not proven.** `ref-extract` contains no mention of `file://`. Verified
+  end-to-end on a local delivery: `file://…/index.html` → `ref-extract` (6 nodes) → `url-compile`
+  (5 classes, 4 strings) → inventory → `wf-preflight` **CLEAN**. The claim now stands on a run.
+- **React / Vue / SPA / Storybook named as a first-class route** — it is a live URL (localhost or deployed);
+  hashed and utility class names are expected and already handled since v2.1.8, because class identity comes
+  from role + style fingerprint rather than the framework's generated names.
+- **Test fixtures renamed off the debug sites** (`site-nav__*`, `acme-header`, `example-site-design`,
+  `ACMEWORKS`). A fixture named after a test site reads like a target, which is how "the agent is built for one
+  site" becomes true by accident.
+- One assertion was passing by accident: the fluid-width case had no bare-px container in its fixture. Fixture
+  fixed so the rule is actually exercised. 24 url-compile · 19 wf-section · 13 wf-preflight · 5
+  content-coverage · 6 wf-doctor cases green; `wf-lint` 0/0.
+
 ## v2.1.9 — 2026-08-07
 
 Diagnosed the footer that cost 68 calls and 57 minutes. The count was not the finding: **no pipeline script

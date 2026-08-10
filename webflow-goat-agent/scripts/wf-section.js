@@ -109,6 +109,11 @@ function intake() {
     if (flag('section-tag')) cargs.push('--section-tag');
     r = stage('compile', 'figma-compile.js', cargs);
     if (r.code !== 0) { console.log('  FAIL  figma-compile'); process.exit(1); }
+    // A Figma reference's copy can be substituted exactly as easily as a URL's. figma-parse emits
+    // nodes[].text, so the SAME gate works — it was simply never wired here (v2.1.10).
+    r = stage('inventory', 'content-coverage.js', ['inventory', parsed, inventory]);
+    if (r.code !== 0) { console.log('  FAIL  content-coverage inventory'); process.exit(1); }
+    console.log('  inventory ' + inventory + '   <- step 6b verifies the published page against this, --mode=' + mode);
   } else {
     const cargs = [extract, '--prefix=' + prefix, '--section=' + section, '--out-plan=' + plan, '--out-contract=' + contract];
     if (opt('font')) cargs.push('--font=' + opt('font'));
@@ -167,8 +172,13 @@ function token() {
   if (!(st.page && st.page.page_id)) fails.push('no page lock in build_state — wf-resolve.js --page=<id> locks the target (Rule 6: build where the user is)');
   if (!fs.existsSync(spec)) fails.push('spec missing: ' + spec + ' — the spec IS the build contract; a cold session resumes from it');
   if (!fs.existsSync(plan)) fails.push('plan missing: ' + plan + ' — run `wf-section.js intake` (it compiles the plan; hand-authoring one is what cost 204 calls)');
-  if (source !== 'figma' && source !== 'screenshot' && !fs.existsSync(inv)) {
-    fails.push('content inventory missing: ' + inv + ' — without it no gate can tell a replica from substituted content (step 6b)');
+  // EVERY source needs a content inventory (v2.1.10). A machine capture produces it (url/html/figma);
+  // a screenshot has none, so the strings are transcribed by hand into the same file. Same gate either way —
+  // otherwise the one source without a gate is the one where substituted content ships unnoticed.
+  if (!fs.existsSync(inv)) {
+    fails.push(source === 'screenshot'
+      ? 'content inventory missing: ' + inv + ' — a screenshot has no machine capture, so TRANSCRIBE every visible string into it as {"strings":[{"text":"…"}],"structure":{},"counts":{}}. Without it nothing can tell a replica from substituted content (step 6b)'
+      : 'content inventory missing: ' + inv + ' — run `wf-section.js intake` (it writes one for figma, url and html). Without it no gate can tell a replica from substituted content (step 6b)');
   }
 
   let pf = null;
@@ -414,7 +424,12 @@ function selfTest() {
   r = run(['token', '--site=' + site, '--section=tok', '--source=url']);
   t('token issues BUILD-TOKEN when target+spec+plan+inventory+preflight all hold', r.code === 0 && /BUILD-TOKEN /.test(r.out), r.out);
   r = run(['token', '--site=' + site, '--section=tok', '--source=figma']);
-  t('figma source needs no content inventory', r.code === 0, r.out);
+  t('figma source needs the SAME content inventory (v2.1.10)', r.code === 0, r.out);
+  fs.unlinkSync(path.join(site, 'specs', 'tok.inventory.json'));
+  r = run(['token', '--site=' + site, '--section=tok', '--source=figma']);
+  t('figma without an inventory is refused too', r.code === 1 && /inventory missing/.test(r.out), r.out);
+  r = run(['token', '--site=' + site, '--section=tok', '--source=screenshot']);
+  t('screenshot is told to TRANSCRIBE the strings, not exempted', r.code === 1 && /TRANSCRIBE/.test(r.out), r.out);
 
   r = run(['intake', '--site=' + site, '--section=hero', '--prefix=hero']);
   t('intake with NO source names both figma and url/html paths', r.code === 2 && /--dcjsx/.test(r.out) && /--extract/.test(r.out), r.out);
@@ -426,7 +441,7 @@ function selfTest() {
     { tag: 'header', depth: 0, path: 'header', class: 'nav', box: { x: 0, y: 0, w: 1440, h: 80 }, styles: { display: 'flex', height: '80px' } },
     { tag: 'span', depth: 1, path: 'header>span', class: 'nav__label', text: 'Products', box: { x: 10, y: 10, w: 60, h: 20 }, styles: { 'font-size': '14px' } },
   ] }));
-  r = run(['intake', '--site=' + site, '--section=urlsec', '--prefix=nhp-urlsec', '--extract=' + ex]);
+  r = run(['intake', '--site=' + site, '--section=urlsec', '--prefix=acme-urlsec', '--extract=' + ex]);
   t('URL/HTML source compiles through wf-section intake (was Figma-only)', r.code === 0 && /source=url\/html/.test(r.out), r.out);
   t('intake writes the content inventory for url/html', fs.existsSync(path.join(site, 'specs', 'urlsec.inventory.json')), r.out);
   t('intake defaults to replica mode', /mode=replica/.test(r.out), r.out);

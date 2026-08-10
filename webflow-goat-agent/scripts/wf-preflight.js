@@ -367,9 +367,9 @@ if (SELFTEST) {
   // FIX 4: a block prefix from the SOURCE FILE must be blocked; the site's own initials must pass.
   const prefixPlan = p => ({ section: 'x', classes: [{ name: p, properties: { color: '#000' } }, { name: p + '__row', properties: {} }], tree: { type: 'Section', styleNames: [p] } });
   const withArgs = (plan, site, known) => check(plan, { sitePrefix: site, known }).blockers.map(b => b.kind);
-  cases.push(['foreign prefix blocked (kush on new-hive-pro-design)', withArgs(prefixPlan('kush-nav'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
-  cases.push(['site initials accepted (nhp)', !withArgs(prefixPlan('nhp-nav'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
-  cases.push(['existing registry prefix accepted (hc)', !withArgs(prefixPlan('hc-hero'), 'new-hive-pro-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['foreign prefix blocked (foreign prefix on example-site-design)', withArgs(prefixPlan('kush-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['site initials accepted (nhp)', !withArgs(prefixPlan('nhp-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['existing registry prefix accepted (hc)', !withArgs(prefixPlan('hc-hero'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
   cases.push(['no site-prefix given = check disabled', !withArgs(prefixPlan('kush-nav'), '', '').includes('block-prefix-foreign')]);
 
   let banOk = true;

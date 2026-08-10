@@ -348,19 +348,21 @@ function selfTest() {
   fs.writeFileSync(ex, JSON.stringify({
     url: 'https://example.com/', viewport: { width: 1440 },
     nodes: [
-      { tag: 'header', depth: 0, path: 'header', class: 'global-navigation', box: { x: 0, y: 0, w: 1440, h: 80 }, styles: { display: 'flex', height: '80px', 'padding-left': '40px', gap: '32px', 'font-family': 'Clarkson, Helvetica', transition: 'background-color 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), top 0.3s ease' } },
-      { tag: 'a', depth: 1, path: 'header>a', class: 'global-navigation__logo-link', href: '/', box: { x: 40, y: 25, w: 208, h: 30 }, styles: { display: 'block', width: '208.4px' } },
-      { tag: 'span', depth: 2, path: 'header>a>span', class: 'global-navigation__logo-text', text: 'SQUARESPACE', box: { x: 40, y: 25, w: 200, h: 30 }, styles: { 'font-size': '20px', color: 'rgb(255,255,255)' } },
-      { tag: 'a', depth: 1, path: 'header>a[2]', class: 'global-navigation__skip-link', href: '#content', box: { x: -1000, y: 40, w: 48, h: 48 }, styles: {} },
-      { tag: 'div', depth: 1, path: 'header>div[3]', class: 'global-navigation__menu', box: { x: 400, y: 0, w: 600, h: 80 }, styles: { display: 'grid', 'border-radius': '10px' } },
-      { tag: 'span', depth: 2, path: 'header>div[3]>span', class: 'global-navigation__eyebrow', text: 'Website', box: { x: 410, y: 10, w: 60, h: 14 }, styles: { 'font-size': '11px', width: '59.44px' } },
-      { tag: 'h2', depth: 2, path: 'header>div[3]>h2', class: 'global-navigation__blade-title', text: 'Squarespace Premium', box: { x: 410, y: 30, w: 200, h: 20 }, styles: { 'font-size': '15px' } },
-      { tag: 'img', depth: 2, path: 'header>div[3]>img', class: 'global-navigation__blade-img', box: { x: 700, y: 10, w: 24, h: 24 }, styles: { width: '24px', height: '24px' } },
+      { tag: 'header', depth: 0, path: 'header', class: 'site-nav', box: { x: 0, y: 0, w: 1440, h: 80 }, styles: { display: 'flex', height: '80px', 'padding-left': '40px', gap: '32px', 'font-family': 'Clarkson, Helvetica', transition: 'background-color 0.5s cubic-bezier(0.165, 0.84, 0.44, 1), top 0.3s ease' } },
+      { tag: 'a', depth: 1, path: 'header>a', class: 'site-nav__logo-link', href: '/', box: { x: 40, y: 25, w: 208, h: 30 }, styles: { display: 'block', width: '208.4px' } },
+      { tag: 'span', depth: 2, path: 'header>a>span', class: 'site-nav__logo-text', text: 'ACMEWORKS', box: { x: 40, y: 25, w: 200, h: 30 }, styles: { 'font-size': '20px', color: 'rgb(255,255,255)' } },
+      { tag: 'a', depth: 1, path: 'header>a[2]', class: 'site-nav__skip-link', href: '#content', box: { x: -1000, y: 40, w: 48, h: 48 }, styles: {} },
+      { tag: 'div', depth: 1, path: 'header>div[3]', class: 'site-nav__menu', box: { x: 400, y: 0, w: 600, h: 80 }, styles: { display: 'grid', 'border-radius': '10px' } },
+      { tag: 'span', depth: 2, path: 'header>div[3]>span', class: 'site-nav__eyebrow', text: 'Website', box: { x: 410, y: 10, w: 60, h: 14 }, styles: { 'font-size': '11px', width: '59.44px' } },
+      { tag: 'h2', depth: 2, path: 'header>div[3]>h2', class: 'site-nav__blade-title', text: 'Acme Premium', box: { x: 410, y: 30, w: 200, h: 20 }, styles: { 'font-size': '15px' } },
+      { tag: 'img', depth: 2, path: 'header>div[3]>img', class: 'site-nav__blade-img', box: { x: 700, y: 10, w: 24, h: 24 }, styles: { width: '24px', height: '24px' } },
+      // a CONTAINER with a bare px width: the reference viewport is not responsive intent (Rule 7)
+      { tag: 'div', depth: 2, path: 'header>div[3]>div[2]', class: 'site-nav__inner', box: { x: 410, y: 10, w: 1200, h: 60 }, styles: { display: 'flex', width: '1200px' } },
     ],
   }));
   const run = a => { const r = require('child_process').spawnSync(process.execPath, [__filename, ...a], { encoding: 'utf8' }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') } };
   const planOut = path.join(tmp, 'p.json');
-  const r = run([ex, '--prefix=nhp-header', '--font=Inter', '--out-plan=' + planOut, '--out-contract=' + path.join(tmp, 'c.json')]);
+  const r = run([ex, '--prefix=acme-header', '--font=Inter', '--out-plan=' + planOut, '--out-contract=' + path.join(tmp, 'c.json')]);
   const plan = JSON.parse(fs.readFileSync(planOut, 'utf8'));
   const flat = JSON.stringify(plan);
   const cls = plan.classes.map(c => c.name);
@@ -375,7 +377,7 @@ function selfTest() {
     ['gap expanded to longhand', flat.includes('grid-column-gap'), true],
     ['border-radius expanded to 4 corners', (flat.match(/border-(top|bottom)-(left|right)-radius/g) || []).length >= 4, true],
     ['offscreen skip-link dropped', flat.includes('#content'), false],
-    ['class names re-prefixed from the reference BEM', cls.includes('nhp-header__logo-text'), true],
+    ['class names re-prefixed from the reference BEM', cls.includes('acme-header__logo-text'), true],
     ['proprietary font substituted', flat.includes('Clarkson'), false],
     ['fractional text width dropped', flat.includes('208.4px') || flat.includes('59.44px'), false],
     ['intrinsic img size kept', flat.includes('"width":"24px"'), true],
@@ -383,7 +385,7 @@ function selfTest() {
     ['container px width becomes fluid 100% + max-width', flat.includes('"width":"100%"') && flat.includes('"max-width"'), true],
     ['transition shorthand expanded (preflight blocks it otherwise)', flat.includes('transition-timing-function'), true],
     ['cubic-bezier survived paren-aware splitting', flat.includes('cubic-bezier(0.165, 0.84, 0.44, 1)'), true],
-    ['every reference string carried', ['SQUARESPACE', 'Website', 'Squarespace Premium'].every(s => flat.includes(s)), true],
+    ['every reference string carried', ['ACMEWORKS', 'Website', 'Acme Premium'].every(s => flat.includes(s)), true],
   ];
   let ok = true;
   for (const [name, got, want] of cases) { const pass = got === want; ok = ok && pass; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}` + (pass ? '' : `  (got ${JSON.stringify(got)}, want ${JSON.stringify(want)})`)) }
