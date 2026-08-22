@@ -1,7 +1,7 @@
 ---
 name: agent-source-path-isolation
 description: "User demands strict token isolation between design-source pipelines in agents — Figma build must never load URL-reference instructions/scripts, and vice versa"
-metadata: 
+metadata:
   node_type: memory
   type: feedback
   originSessionId: ff6c6685-8232-4877-a0e7-3fa589f4e1ce

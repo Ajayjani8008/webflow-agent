@@ -1,7 +1,7 @@
 ---
 name: webflow-cms-collection-list-mcp
 description: How to build a native dynamic CMS Collection List via Webflow MCP (element builder + bindings) and its hard limits
-metadata: 
+metadata:
   node_type: memory
   type: reference
   originSessionId: c0b6224d-58c9-4023-8b76-60b82c56e731
@@ -12,7 +12,7 @@ Building a native dynamic Collection List through the Webflow MCP (no custom cod
 **Flow that works:**
 1. `data_cms_tool create_collection` → then `create_collection_static_field` for each field. Image field accepts `{url, alt}` on item create (Webflow re-hosts it). Switch = boolean field. Creating a collection auto-makes a `detail_*` template page.
 2. Item images: upload photo first (`create_asset` with md5 file_hash → POST bytes to the returned S3 `uploadUrl` as multipart, field order: acl,bucket,X-Amz-*,key,Policy,X-Amz-Signature,success_action_status,Content-Type,Cache-Control,file → 201), then pass its hostedUrl in item `fieldData.image`.
-3. `data_element_builder type:"CMSCollection"` → creates a `DynamoWrapper > DynamoList > DynamoItem` (+ DynamoEmpty). 
+3. `data_element_builder type:"CMSCollection"` → creates a `DynamoWrapper > DynamoList > DynamoItem` (+ DynamoEmpty).
 4. Bind the collection: `set_settings` on the DynamoWrapper, key `source`, **`static_json` `{"collectionId":"<id>"}`** (plain string / static_text is rejected — error tells you the shape).
 5. Build the card template INSIDE the DynamoItem (append). Style the DynamoList for gap/layout.
 6. Bind fields with `set_settings` + `binding:{source_type:"cms",collection_id,field_id}`:

@@ -1,7 +1,7 @@
 ---
 name: webflow-encircle-resources-build
 description: The Encircle Resources/About page Webflow build — site/page/figma ids and the existing rp-* class system
-metadata: 
+metadata:
   node_type: memory
   type: project
   originSessionId: 2d5aa1d5-db02-486b-b069-634c03dcdc49

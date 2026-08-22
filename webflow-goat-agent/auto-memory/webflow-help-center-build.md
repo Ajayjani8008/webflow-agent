@@ -1,7 +1,7 @@
 ---
 name: webflow-help-center-build
 description: "The Encircle Help Center Webflow page build — ids, hc-* class system, whtml build method and two gotchas"
-metadata: 
+metadata:
   node_type: memory
   type: project
   originSessionId: 2e467a6f-9f93-42a6-8986-1a870ea26a46

@@ -1,7 +1,7 @@
 ---
 name: webflow-mcp-gotchas
 description: Webflow MCP native-build limits + reliable headless-Chrome mobile verify method
-metadata: 
+metadata:
   node_type: memory
   type: reference
   originSessionId: fe179785-cf97-448f-a506-cfc1d4196ea2

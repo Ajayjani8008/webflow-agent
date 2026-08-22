@@ -1,7 +1,7 @@
 ---
 name: webflow-svg-native-path
 description: "Correct native Webflow SVG handling — Image element is the SVG module, bind by asset id, keep vector"
-metadata: 
+metadata:
   node_type: memory
   type: reference
   originSessionId: 3a2cd7e8-755a-43e4-8765-898f9c4b8d6e
