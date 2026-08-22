@@ -60,6 +60,9 @@ const SHORTHAND = {
 };
 // intrinsic sizes are authored; a text node's measured width is not
 const INTRINSIC_TAGS = new Set(['img', 'svg', 'video', 'canvas']);
+// Tags Webflow ships with NON-ZERO default margins. A reference that resets margins to 0 must say so
+// explicitly for these, or the Webflow default silently applies. See the margin block in authoredProps.
+const WF_MARGIN_DEFAULT_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'blockquote', 'figure', 'pre']);
 
 
 // ── Naming is NOT the reference's problem to solve ───────────────────────────────────────────────
@@ -262,6 +265,28 @@ function compile() {
         if (!w) continue;
         if (!out[`border-${s}-style`] && anyStyle) out[`border-${s}-style`] = anyStyle;
         if (!out[`border-${s}-color`] && anyColor) out[`border-${s}-color`] = anyColor;
+      }
+    }
+
+    // ── WEBFLOW'S DEFAULT TYPOGRAPHY MARGINS (v2.1.16) ────────────────────────────────────────────────
+    // A reference with `* { margin: 0 }` computes margin-top/bottom as 0px, and a 0 looks like "nothing to
+    // author" — so the compiler dropped it. But Webflow does NOT start from zero: it ships default margins
+    // on headings, paragraphs and lists (h3 gets 20px top / 10px bottom, ul gets 10px bottom). "Absent" in
+    // the plan therefore means 20px on the page, not 0. Measured 2026-08-22: a card came out exactly 30px
+    // taller than its reference — h3 margin-top 20 + ul margin-bottom 10, with the h3's bottom margin
+    // collapsing into the ul's top margin. Every heading, paragraph and list built from an HTML reference
+    // carries this, and it is invisible in the plan because the property simply is not there.
+    // So: when the reference computes a zero margin on an element Webflow gives a default to, author the
+    // zero EXPLICITLY. An explicit 0 is design intent here, not noise.
+    if (WF_MARGIN_DEFAULT_TAGS.has(String(n.tag || '').toLowerCase())) {
+      for (const side of ['top', 'bottom']) {
+        const k = 'margin-' + side;
+        const raw = (n.styles || {})[k];
+        // ABSENT means zero here. The extractor drops zero-valued properties to keep captures small, so a
+        // reset margin never reaches the plan at all — and "not in the plan" is precisely how Webflow's
+        // 20px default wins. For these tags a computed margin always exists, so absent == 0.
+        const isZero = raw === undefined || parseFloat(raw) === 0;
+        if (out[k] === undefined && isZero) out[k] = '0px';
       }
     }
 

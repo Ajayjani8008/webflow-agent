@@ -247,3 +247,22 @@ Two traps in one element, both caught by the step-5 placeholder sweep BEFORE a p
 **Why this cost nothing:** the pre-publish sweep queries every planned string on the page before publishing. It
 found 3 of 7 strings missing while the page was still unpublished. Publishing first would have burned a publish
 and produced a section that passed every structural gate with a third of its content absent.
+
+## 2026-08-22 — Webflow's default typography margins are NOT zero, and a zero in the reference never reaches the plan
+
+The last 30px between a build and a pixel-perfect match, and it is structural rather than a one-off.
+
+A reference with `* { margin: 0 }` computes `margin-top: 0px` on its headings and lists. `ref-extract` drops
+zero-valued properties to keep captures small, so the zero never reaches the plan — and **"absent from the plan"
+is not "zero on the page"**: Webflow ships defaults (h3 = 20px top / 10px bottom, ul = 10px bottom). Measured: a
+card rendered exactly 30px taller than its reference — h3 margin-top 20 + ul margin-bottom 10, with the h3's
+bottom margin collapsing into the ul's 16px top margin.
+
+**Fix (v2.1.16):** for the tags Webflow gives defaults to — h1-h6, p, ul, ol, blockquote, figure, pre — the
+compiler now authors `margin-top: 0px` / `margin-bottom: 0px` EXPLICITLY when the reference computes zero,
+including when the property is absent from the capture (absent == zero for these tags, since a computed margin
+always exists). An explicit zero is design intent here, not noise.
+
+**Why it was invisible:** the plan looked clean, preflight passed, property equality passed — because the
+property simply was not there to compare. Only the height delta showed it, and only after the font mismatch
+was removed. Two defects stacked; the smaller one is unreachable until the larger is cleared.
