@@ -215,3 +215,18 @@ halves and neither works alone: prefix rules
 — invoke pack scripts as ONE command with an ABSOLUTE path, never `cd … && node x.js`, never `node $WF/…`,
 because a permission rule can only match a literal prefix. 40 Bash calls is 40 approvals the user cannot see
 the purpose of; batch them and say what the batch is for.
+
+## 2026-08-22 — the MCP has NO page-delete action (confirmed via get_more_tools, not assumed)
+
+`data_pages_tool` exposes create_page, update_page_settings, bulk_update_pages, get_page_metadata, list_pages,
+the schema-markup actions and the branch actions — and **nothing that deletes or archives a static page**.
+`get_more_tools` (category PAGES, concrete brief) answered: *"we have shown you the full tool list"*. So this is a
+real surface gap, not a lookup failure, and Rule 5 is satisfied — asked, not recalled.
+
+**Native fallback that actually removes it from the web:** `update_page_settings { draft: true }` then republish.
+The page is excluded from publishing and the route returns 404 (verified). The page still exists in the Designer,
+so deleting it for real is a one-click manual step the user has to take.
+
+**Consequence for builds:** a page created via `create_page` cannot be un-created by the agent. Create pages only
+when the user asked for that page to exist — never as a scratch target for a build or a test, because the cleanup
+is not fully in the agent's hands.
