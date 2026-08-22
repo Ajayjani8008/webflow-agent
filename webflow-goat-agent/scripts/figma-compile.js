@@ -8,7 +8,7 @@
 // by construction, and makes the contract free instead of a hand-written chore that does not scale.
 //
 // Usage:
-//   node figma-compile.js <parsed.json> --prefix=kush-hero [--root=1:4888] [--section-tag]
+//   node figma-compile.js <parsed.json> --prefix=example-hero [--root=1:4888] [--section-tag]
 //        [--out-plan=plan.json] [--out-contract=contract.json] [--json]
 //   node figma-compile.js --self-test
 //
@@ -68,7 +68,7 @@ function elementTypeFor(n, isRoot, sectionTag) {
 
 function compile(parsed, opts) {
   const prefix = opts.prefix;
-  if (!prefix) throw new Error('--prefix is required (e.g. --prefix=kush-hero)');
+  if (!prefix) throw new Error('--prefix is required (e.g. --prefix=example-hero)');
   const nodes = parsed.nodes.filter(n => n.nodeId || Object.keys(n.css).length || n.text || n.src);
   const rootId = opts.root || (nodes.find(n => n.nodeId) || {}).nodeId;
   const decisions = [], assets = [];
@@ -159,7 +159,7 @@ if (SELFTEST) {
     { nodeId: '1:4', name: 'Dot', tag: 'div', depth: 1, text: null, src: null, css: { width: '11px', height: '11px', 'background-color': '#F6E7BE' }, flags: [] },
     { nodeId: '1:5', name: 'Shop Slider', tag: 'div', depth: 1, text: null, src: null, css: { position: 'absolute', left: '10px' }, flags: ['rotation -90deg — bake it'] }
   ] };
-  const r = compile(parsed, { prefix: 'kush-hero', sectionTag: true, srcName: 'self-test' });
+  const r = compile(parsed, { prefix: 'example-hero', sectionTag: true, srcName: 'self-test' });
   const fails = [];
   const has = (cond, what) => { if (!cond) fails.push(what) };
   has(r.plan.tree.type === 'Section', 'root becomes Section');
@@ -168,12 +168,12 @@ if (SELFTEST) {
   has(r.plan.classes.length === 4, `identical Dot property sets collapse to ONE class (got ${r.plan.classes.length} classes)`);
   const dot = r.contract.elements.find(e => /dot/.test(e.sel));
   has(dot && dot.count === 2, 'shared class asserts count 2');
-  has(!('width' in (r.contract.elements.find(e => e.sel === '.kush-hero__title') || { expect: {} }).expect), 'min-content width NOT asserted');
+  has(!('width' in (r.contract.elements.find(e => e.sel === '.example-hero__title') || { expect: {} }).expect), 'min-content width NOT asserted');
   has(r.decisions.some(d => /fill idiom/.test(d.decide)), 'fill idiom surfaced as a decision');
   has(r.decisions.some(d => /Slider/.test(d.decide)), 'module hint surfaced for a slider-named layer');
   has(r.decisions.some(d => /bake/i.test(d.decide)), 'parser flag carried into decisions');
   has(r.plan.tree.children.find(c => c._positioning), 'absolute positioning preserved + annotated');
-  const titleExpect = r.contract.elements.find(e => e.sel === '.kush-hero__title').expect;
+  const titleExpect = r.contract.elements.find(e => e.sel === '.example-hero__title').expect;
   has(titleExpect['font-weight'] === '600' && titleExpect['font-size'] === '70px', 'typography asserted');
   console.log(fails.length ? 'SELF-TEST FAIL\n  ' + fails.join('\n  ') : `self-test ok — ${r.plan.classes.length} classes, ${r.contract.elements.length} contract selector(s), ${r.decisions.length} decision(s)`);
   process.exit(fails.length ? 1 : 0);

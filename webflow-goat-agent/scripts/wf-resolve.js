@@ -2,12 +2,12 @@
 // wf-resolve.js — resolve and LOCK the build target before anything is written to Webflow.
 //
 // Why this exists (all three failures are on record in this repo's own state files):
-//   · 2026-08-01: kush-hero was built on 2026-07-31, the target page was found EMPTY the next day and
+//   · 2026-08-01: example-hero was built on 2026-07-31, the target page was found EMPTY the next day and
 //     the whole section was rebuilt from scratch. build_state.page.page_id pointed at "Home"
 //     (6a23a9bc…) while the sections were being written to 6a488b8d…. A full section, paid twice.
-//   · The same site's header shipped verification artefacts under BOTH "kush-nav" and "kush-navbar" —
+//   · The same site's header shipped verification artefacts under BOTH "example-nav" and "example-navbar" —
 //     two complete state/audit/score sets for one section, because the name was never locked.
-//   · kush-header recorded publishes: 3 against a documented cap of 2, because the cap lived in prose.
+//   · example-header recorded publishes: 3 against a documented cap of 2, because the cap lived in prose.
 // Prose cannot enforce any of that at turn 200 under a 500k context. This can.
 //
 // Usage:
@@ -135,7 +135,7 @@ function run() {
     const near = st.sections.filter(s => s.name !== section && (s.name.startsWith(section) || section.startsWith(s.name)));
     if (!sec) {
       if (near.length) warn('SIMILAR SECTION ALREADY RECORDED: ' + near.map(s => s.name).join(', ') +
-        '\n  One section under two names produces two full artefact sets (kush-nav / kush-navbar, 2026-07-31).' +
+        '\n  One section under two names produces two full artefact sets (example-nav / example-navbar, 2026-07-31).' +
         '\n  Reuse the recorded name, or rename it deliberately.');
       sec = { name: section, page: st.page.name || '', status: 'in-progress', node_ids: [], pixel_score: 0, publishes: 0, updated: today() };
       st.sections.push(sec);

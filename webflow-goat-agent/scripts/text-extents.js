@@ -2,7 +2,7 @@
 // text-extents.js — measure the INK extents of a horizontal band in one or two PNGs.
 //
 // Why this exists: pixel-diff tells you a region is wrong; dom-contract tells you the authored
-// properties are right; neither tells you a text run is 6px too wide. On the kush-header build a
+// properties are right; neither tells you a text run is 6px too wide. On the example-header build a
 // 12px-tall brand sub-line ("OF FRAGRANCES") was first missing entirely (invisible to the differ at
 // 98.75% with zero hot regions) and then mis-tracked by a few px (visible to the region gate, but
 // with no measurement to aim a fix at). Letter-spacing, word gaps and per-span tracking are exactly
@@ -19,7 +19,7 @@
 //
 // v2.1 — `contract` runs at INTAKE, before the build. It turns the reference render into measured
 // numbers, so the build targets what the render IS instead of what the spec's arithmetic says it
-// should be. On kush-header the spec's per-span letter-spacing (3.04 / 13.28 px) computed to a 192px
+// should be. On example-header the spec's per-span letter-spacing (3.04 / 13.28 px) computed to a 192px
 // line where the render measures 111px; the error surfaced only after four publishes. `solve` then
 // closes tracking in ONE step from a single measured point instead of guessing a second time.
 //
@@ -95,7 +95,7 @@ if (flag('self-test')) {
   // solve is pure arithmetic: 102px measured at ls 4.4 over 11 gaps, target 111 -> 5.22px
   const solved = 4.4 + (111 - 102) / 11;
   cases.push(['solve is linear and exact', Math.abs(solved - 5.2181818) < 0.001]);
-  // check-spec, on the real kush-header numbers
+  // check-spec, on the real example-header numbers
   const implied = (measured, track, glyphs, fs2) => ((measured - track) / glyphs) / fs2;
   const badSpec = 111 - (3.04 * 2 + 13.28 * 10);                       // -27.88 -> impossible
   const goodSpec = implied(111, 5.07 * 11, 12, 6.832);                 // ~0.67 em -> plausible

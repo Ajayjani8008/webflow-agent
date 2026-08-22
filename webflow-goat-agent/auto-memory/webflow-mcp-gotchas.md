@@ -7,7 +7,7 @@ metadata:
   originSessionId: fe179785-cf97-448f-a506-cfc1d4196ea2
 ---
 
-Reusable traps hit building native Webflow via the MCP tools (see [[webflow-pixel-match-method]], [[webflow-help-center-build]]).
+Reusable traps hit building native Webflow via the MCP tools (see [[webflow-pixel-match-method]]).
 
 - **FormTextInput placeholder is unsettable via MCP.** `set_attributes name="placeholder"` → generic "internal error"; setting via `attributes` channel → "placeholder is a reserved attribute name"; no `placeholder` key exists in the input's settings (only domId/visibility/name/required/type). Native workaround: overlay a `pointer-events:none` text element (absolute, left=icon-pad, right=kbd-pad, ellipsis) over a transparent real input. Real input stays focusable underneath.
 - **`data_element_builder` `set_text` is ignored on `TextBlock`** (comes back as generic `Block` showing the default "This is some text inside of a div block"). Use `Paragraph` for a text element that accepts `set_text` on creation.

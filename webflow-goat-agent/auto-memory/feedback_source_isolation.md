@@ -15,4 +15,4 @@ When adding a new source path (e.g. live-URL reference) to a build agent, it mus
 - One source = one intake skill + one cache dir; agent brain gets an explicit SOURCE ISOLATION rule naming what must NOT be loaded per source.
 - Skill frontmatter descriptions must exclude the other source explicitly (description drives lazy-load selection).
 - Shared downstream (spec format, pixel-verify, responsive-pass) stays shared — only intake is source-specific.
-- Applied in webflow-goat: `url-intake` skill vs `design-intake`; see [[webflow-goat-pack]].
+- Applied in webflow-goat: `url-intake` skill vs `design-intake`;

@@ -1,7 +1,7 @@
 // Element-clip published-page screenshot for Webflow pixel-verify.
 // Usage: node shot-el.js <url> <out.png> <W> <cssSelector> <mobile:1|0> <port>
-//   e.g. node shot-el.js "https://x.webflow.io/" hero.png 1440 ".partner-hero" 0 9247
-//        mobile: node shot-el.js "https://x.webflow.io/" hero-m.png 390 ".partner-hero" 1 9248
+//   e.g. node shot-el.js "https://x.webflow.io/" hero.png 1440 ".example-hero" 0 9247
+//        mobile: node shot-el.js "https://x.webflow.io/" hero-m.png 390 ".example-hero" 1 9248
 // Clips to the element's bounding box (CDP clip is PAGE-origin, not viewport) and
 // defeats Webflow load-animation opacity:0. Needs ws: npm i ws --no-save at home dir. Cross-platform (Win/Mac/Linux).
 const CDP=require('child_process');const http=require('http');const fs=require('fs');const os=require('os');const path=require('path');let WebSocket;try{WebSocket=require('ws')}catch(e){WebSocket=require(path.join(os.homedir(),'node_modules','ws'))}

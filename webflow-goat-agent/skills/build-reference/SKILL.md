@@ -216,7 +216,7 @@ no "inherit from the design" here; the base class already decided.
 **Gradient text is a child element, not a property on the heading.** Webflow has no per-run text fill, so a two-tone or
 gradient headline is built as: heading holds the plain part via `set_text`, then append a **`DOM` `span` child** for the
 accent run. Style the span class with the unprefixed longhands — `background-image: linear-gradient(…)` ·
-`background-clip: text` · `color: transparent`. That combination is verified working through `data_style_tool` (Encircle
+`background-clip: text` · `color: transparent`. That combination is verified working through `data_style_tool` (confirmed on a production
 build). **Do not send `-webkit-text-fill-color` or any other `-webkit-*` property — the style tool rejects the whole
 call**, and `color: transparent` already does that job in every browser Webflow targets. Solid mid-gradient fallback +
 ledger entry is the LAST resort, only after the unprefixed set has actually been attempted and rejected — never the

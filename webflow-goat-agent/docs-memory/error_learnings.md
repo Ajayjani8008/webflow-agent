@@ -46,7 +46,7 @@ Causes 1/4/5 = Designer work, not API-fixable.
 - [2026-07-28] verify: `element_snapshot_tool` is free of *publishing*, not free of tokens — it returns an image. Use a text read-back to learn a value, a snapshot only to SEE something. The old pack called snapshots "free", which encouraged exactly the wrong habit.
 
 
-## 2026-07-26 — nshero build (node 709:2702)
+## 2026-07-26 — hero build (node 709:2702)
 
 **data-URI backgrounds are IMPOSSIBLE via data_style_tool.** The style store TRUNCATES the value at the first `;`, leaving `url("data:image/svg+xml` — for both `;utf8,` and `;base64,`. Worse, the truncated value is then unreconcilable: further `update_style` calls on that class fail with `MPS rejected update ... [Conflict]`, which reads like a transient multiplayer error but is not — the only recovery is to clear the property, then write fresh. FIX: never inline a data-URI. Upload the file (data_assets_tool create_asset -> presigned S3 POST -> hostedUrl) and set `background-image: url(<cdn hostedUrl>)`. CDN URLs contain no `;` so they store intact, and unlike data-URIs they also render on the Designer canvas.
 
@@ -62,7 +62,7 @@ Causes 1/4/5 = Designer work, not API-fixable.
 
 **Score against the reference PNG's TRUE dimensions.** The 709:2702 reference is 1400x876 (aspect 1.598 = the 1920x1200.9 frame). Resizing the build shot to 1400x900 stretched it 2.7% and scored 96.63% FAIL; at the correct 1400x876 the same build scored 97.90% PASS. Always read the reference header dims first — a wrong-aspect compare invents diffs everywhere.
 
-## 2026-07-31 — kush-hero build (Kush file, node 1:1081)
+## 2026-07-31 — example-hero build (node 1:1081)
 
 **A BEM modifier only applies if it EXISTS as a real combo class.** `data_element_builder` `set_style`
 and `data_element_tool` `set_style` both reject `style_names: [base, modifier]` with
@@ -92,7 +92,7 @@ weights 500/600/700 means the family is variable. Register once via `create_font
 instance — confirmed by a 99.93% pixel match on a 70px/600 Yrsa headline. Do not try to register the
 same file three times: `file_hash` is content-addressed, so the three records collide.
 
-## 2026-07-31 — kush-header build (node 1:4897)
+## 2026-07-31 — example-header build (node 1:4897)
 
 **A flex column anchored by `left` centres on its WIDEST child, not on the axis the design uses.**
 The brand (logo + wordmark + tracked sub-line) was built as `position:absolute; left:32px; flex-column;
@@ -108,7 +108,7 @@ produced a 162.5px line; the reference render measures 109px, and 10 characters 
 cannot fit 109px at any interpretation. Built to the measured render width (7.93px) and logged the
 contradiction. Always bbox-measure a tracked line against the render before trusting the number.
 
-**Verify the capture and the reference describe the SAME BOX.** Scoring a full-width `.kush-nav`
+**Verify the capture and the reference describe the SAME BOX.** Scoring a full-width `.example-nav`
 (1920px) against a reference cropped to the inner bar (1632px) made pixel-diff upscale the reference
 1.18x: it reported "height delta 16.1% (118 vs 99)" and six middle-right hot regions on a build that
 was actually fine. A right-edge cluster of hot regions plus a large height delta is the signature of a
@@ -123,7 +123,7 @@ and append a Paragraph. Delete the three placeholder links unless the design sup
 hide the default Icon with a `display:none` class when the design uses its own chevron asset. Always
 grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.
 
-## 2026-08-01 — kush-header v2.1 (three traps, all cost a publish)
+## 2026-08-01 — example-header v2.1 (three traps, all cost a publish)
 
 **1. `TextBlock` silently drops `set_text`.** Caught by `wf-preflight` before any MCP write. `TextBlock` is created as a `Block`, which does not own its text node, so it keeps Webflow's own placeholder. Three elements would have shipped as *"This is some text inside of a div block."* — a Rule 14 fail found only after publishing, in the old flow. **Use `Paragraph` (margins zeroed) for a styled text run inside a link/flex parent.**
 
@@ -135,7 +135,7 @@ grep the published HTML for "Link 1" / ">Dropdown<" before calling a nav done.
 
 **Also confirmed:** `Navbar` remains absent from the `data_element_builder` type enum (`available:false` in skeletons.json) — an API-built header cannot be a real Navbar. `Dropdown` IS available and ships `"Dropdown"` + `"Link 1..3"` placeholders plus an icon-font `Icon`; strip all five per dropdown in the same build pass.
 
-## 2026-08-07 — header build on new-hive-pro-design (MCP 2.0.1), three verified platform traps
+## 2026-08-07 — header build on example-site-design (MCP 2.0.1), three verified platform traps
 
 - **`DropdownLink` is NOT in the `data_element_builder` type enum** (only `Dropdown` is). A Dropdown's own
   three links arrive with the wrapper, but you cannot create more. Native fix: build `LinkBlock` (needs
@@ -184,7 +184,7 @@ environment workarounds (`npm install` mid-flight, `NODE_PATH=$(…)`, inline `s
 
 The structural finding is worse than the count: **no pipeline script ran at all** — no `wf-resolve`, no
 `wf-section intake`, no `wf-preflight`, no `record`. The section was built into `covilla-page-design`, a site
-with **no state dir**, using `new-hive-pro-design`'s ref-cache, and was never recorded — so `build_state` still
+with **no state dir**, using `example-site-design`'s ref-cache, and was never recorded — so `build_state` still
 says that footer is `in-progress, cost null` on a site where it does not exist, while 69 real links sit live on
 another site.
 

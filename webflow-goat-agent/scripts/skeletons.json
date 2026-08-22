@@ -157,7 +157,7 @@
     "The DropdownWrapper is position:relative, so an absolute panel's left/right/width resolve against the TOGGLE, not the header \u2014 a full-width mega panel is offset and clipped. Set the wrapper `position: static` and give the panel `left:0; right:0; width:100%` so it resolves against the positioned header.",
     "The icon-font Icon is absolutely positioned at the toggle's right edge. With `padding:0` on the toggle it lands ON TOP of the label. Give the Icon a class with `position:relative; top/right/bottom/left:auto` and set the toggle `flex-direction: row-reverse` so the chevron follows the text.",
     "The open state is the `.w--open` class, which `data_style_tool` cannot target \u2014 any open-state style (chevron rotate, panel fade) is a Designer/Interactions item, not an API one.",
-    "Verified 2026-08-07 on new-hive-pro-design: each of the first three cost one publish because they were prose-or-nothing instead of data."
+    "Verified 2026-08-07 on example-site-design: each of the first three cost one publish because they were prose-or-nothing instead of data."
    ]
   },
   "RichText": {

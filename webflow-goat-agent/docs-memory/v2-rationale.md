@@ -66,8 +66,8 @@ call regardless of what that call did.
 | `CLAUDE.md` and `webflow-goat.md` byte-identical except frontmatter — ~10k tokens twice per session | router (≤6KB) + pointer agent (≤4KB) + rules in the `webflow-core` skill, loaded only on build lanes. `wf-lint` now fails on duplication and on either file exceeding budget |
 | `rules/webflow/core.md` = 2.1k tokens of pure changelog, injected every session | moved to `$WF/CHANGELOG.md`, never loaded |
 | pixel-verify said "ONE image view max" and "2-4 image views" in the same section | one corrected block: 2-4 views, ~6k tokens, reference view mandatory |
-| kush-hero built twice — page lock said "Home", writes went to another page id | `wf-resolve.js` locks site+page+section and blocks a mismatched write |
-| one header shipped artefacts as both `kush-nav` and `kush-navbar` | `wf-resolve.js` warns on a near-miss section name before it forks |
+| example-hero built twice — page lock said "Home", writes went to another page id | `wf-resolve.js` locks site+page+section and blocks a mismatched write |
+| one header shipped artefacts as both `example-nav` and `example-navbar` | `wf-resolve.js` warns on a near-miss section name before it forks |
 | `publishes: 3` against a documented cap of 2 | cap enforced by `wf-resolve.js --publish`, `--force` recorded |
 | 12-call verification pass, hand-assembled | `wf-section.js verify` = verify-section + dom-contract, one call, one verdict |
 | 48 prose `Never` clauses re-read every turn | machine-checkable ones moved into `wf-preflight.js` (placeholder copy, code without authorization, div-imitation, icon flex-shrink, inline style, duplicate class, bare-px width, partial radius, BEM) |

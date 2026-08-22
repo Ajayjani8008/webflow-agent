@@ -16,18 +16,18 @@
 //   node wf-preflight.js <plan.json> [--json] [--site-prefix=<id>] [--known-prefixes=a,b,c]
 //        --site-prefix / --known-prefixes let it reject a block prefix that belongs to neither the
 //        site nor an existing registry convention. A header + hero once shipped 48 classes prefixed
-//        with the FIGMA FILE NAME ("kush-") onto a site called new-hive-pro-design; the rules said
+//        with the FIGMA FILE NAME ("example-") onto a site called example-site-design; the rules said
 //        "BEM kebab-case" and never said where the block name comes from, so the filename filled it.
 //   node wf-preflight.js --self-test
 //
 // Exit 0 clean · 1 blockers found · 2 usage/IO error.
 //
 // Plan shape (only what you know at plan time — every field optional except type):
-//   { "section": "kush-hero",
-//     "classes": [ { "name": "kush-hero", "properties": {"position":"relative"} },
-//                  { "name": "kush-hero__wave--1", "parentStyleNames": ["kush-hero__wave"],
+//   { "section": "example-hero",
+//     "classes": [ { "name": "example-hero", "properties": {"position":"relative"} },
+//                  { "name": "example-hero__wave--1", "parentStyleNames": ["example-hero__wave"],
 //                    "properties": {"width":"1683px"} } ],
-//     "tree": { "type": "Section", "styleNames": ["kush-hero"], "children": [
+//     "tree": { "type": "Section", "styleNames": ["example-hero"], "children": [
 //                 { "type": "TextBlock", "setText": "hi" } ] } }
 const fs = require('fs'); const path = require('path');
 const argv = process.argv.slice(2);
@@ -263,9 +263,10 @@ function check(plan, o) {
     const allowed = new Set(known);
     if (sitePrefix) {
       allowed.add(sitePrefix);
-      // a site id like "new-hive-pro-design" legitimately abbreviates to its initials, "nhp"
-      // a site id like "new-hive-pro-design" legitimately abbreviates to any leading run of its
-      // initials: nh, nhp, nhpd. Accept those, plus any whole word of 3+ chars. "kush" matches none.
+      // a site id like "example-site-design" legitimately abbreviates to its initials, "esd"
+      // a site id like "example-site-design" legitimately abbreviates to any leading run of its
+      // initials: es, esd. Accept those, plus any whole word of 3+ chars. A prefix taken from the
+      // SOURCE FILE name rather than the site matches none of them, which is the point.
       const initials = sitePrefix.split('-').filter(Boolean).map(w => w[0]).join('');
       for (let i = 2; i <= initials.length; i++) allowed.add(initials.slice(0, i));
       sitePrefix.split('-').forEach(w => { if (w.length >= 3) allowed.add(w); });
@@ -367,10 +368,10 @@ if (SELFTEST) {
   // FIX 4: a block prefix from the SOURCE FILE must be blocked; the site's own initials must pass.
   const prefixPlan = p => ({ section: 'x', classes: [{ name: p, properties: { color: '#000' } }, { name: p + '__row', properties: {} }], tree: { type: 'Section', styleNames: [p] } });
   const withArgs = (plan, site, known) => check(plan, { sitePrefix: site, known }).blockers.map(b => b.kind);
-  cases.push(['foreign prefix blocked (foreign prefix on example-site-design)', withArgs(prefixPlan('kush-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['foreign prefix blocked (a prefix taken from the SOURCE FILE name)', withArgs(prefixPlan('srcfile-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
   cases.push(['site initials accepted (esd)', !withArgs(prefixPlan('esd-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
   cases.push(['existing registry prefix accepted (hc)', !withArgs(prefixPlan('hc-hero'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
-  cases.push(['no site-prefix given = check disabled', !withArgs(prefixPlan('kush-nav'), '', '').includes('block-prefix-foreign')]);
+  cases.push(['no site-prefix given = check disabled', !withArgs(prefixPlan('srcfile-nav'), '', '').includes('block-prefix-foreign')]);
 
   let banOk = true;
   for (const [name, ok] of cases) { console.log('  ' + (ok ? 'ok  ' : 'FAIL') + '  ' + name); banOk = banOk && ok; }

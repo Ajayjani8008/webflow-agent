@@ -19,4 +19,4 @@ Webflow has NO dedicated "SVG" element. The `Image` element IS the native SVG-ca
 - `compress_assets` on svg → 400 "never-compressible"; skip SVG in compression.
 - SVG-as-`Image` can't recolor via CSS `color`/`fill` — upload correctly-colored SVG or rebuild glyph natively.
 
-Encoded in build-reference SKILL.md ("SVG & image assets — correct native path"). See [[webflow-help-center-build]] (old whtml-era GOTCHA 1 predates this native path), [[webflow-mcp-gotchas]].
+Encoded in build-reference SKILL.md ("SVG & image assets — correct native path"). (old whtml-era GOTCHA 1 predates this native path), [[webflow-mcp-gotchas]].

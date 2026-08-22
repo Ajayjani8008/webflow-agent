@@ -18,8 +18,8 @@
 // emit   → snapshots the subtree's computed values, to bootstrap a contract or catch regressions.
 //
 // Contract shape:
-//   { "section": "kush-hero", "width": 1920,
-//     "elements": [ { "sel": ".kush-hero__title", "expect": {
+//   { "section": "example-hero", "width": 1920,
+//     "elements": [ { "sel": ".example-hero__title", "expect": {
 //                       "font-family": "Yrsa", "font-size": "70px", "line-height": "80px",
 //                       "color": "#6C461A", "box": { "w": 1035 } } } ] }
 //
