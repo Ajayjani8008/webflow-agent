@@ -279,3 +279,29 @@ so and lists the causes in order: page published and not a draft · debug port f
 
 The general rule this is an instance of: a gate must distinguish "I measured, and it is wrong" from "I could
 not measure". Reporting the second as the first is how a correct build gets rebuilt.
+
+## 2026-08-22 — Webflow's base stylesheet is the biggest single source of "built ≠ reference"
+
+Three separate publishes in one session, three different symptoms, ONE root cause:
+
+| symptom | Webflow default that won |
+|---|---|
+| card 30px too tall | `h3` 20px top / 10px bottom, `ul` 10px bottom |
+| 28px nav bar rendered 40px | `.w-dropdown-toggle` `padding: 20px` |
+| flex siblings sized unevenly | `.w-dropdown` `margin-left/right: auto` |
+
+**The mechanism, and why every gate missed it:** the reference computes these as `0`. `ref-extract` drops
+zero-valued properties to keep captures small. So the zero never reaches the plan — and *absent from the plan
+is not zero on the page*, it is "Webflow decides". The plan looks clean, preflight passes, property equality
+passes, because the property is not there to compare. Only a height delta reveals it, and only after any
+larger difference (a font mismatch) has been cleared.
+
+**Generic fix (v2.1.17), not a per-site patch:** `url-compile` carries `WF_DEFAULTS` (by tag: h1-h6, p, ul,
+ol, blockquote, figure, pre, input, textarea, select, button, label, form, fieldset) and `WF_MODULE_DEFAULTS`
+(by emitted element type: Dropdown, DropdownToggle, DropdownLink, Slider, Tabs, Navbar, Form, FormTextInput,
+FormButton, Button, List, ListItem, Blockquote, RichText). For any node matching either table it authors the
+reference's computed value EXPLICITLY — including zero, and including when the capture omitted it. Verified
+against the real nav capture that cost the publishes: the toggle now compiles with `padding-top/bottom: 0px`
+and the list with `margin-top/bottom: 0px; padding-left: 0px` with no hand-editing.
+
+**Add to the table, never patch a plan.** A new Webflow module that misbehaves is a missing table entry.

@@ -51,7 +51,7 @@ const KEEP = new Set(['display', 'flex-direction', 'flex-wrap', 'align-items', '
   'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
   'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
   'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-  'box-shadow', 'transition',
+  'box-shadow', 'filter', 'backdrop-filter', 'mix-blend-mode', 'object-fit', 'aspect-ratio', 'transition',
   'overflow', 'max-width', 'width', 'height', 'min-height', 'flex-basis', 'text-overflow', 'white-space']);
 const SHORTHAND = {
   'gap': ['grid-row-gap', 'grid-column-gap'],
@@ -62,7 +62,58 @@ const SHORTHAND = {
 const INTRINSIC_TAGS = new Set(['img', 'svg', 'video', 'canvas']);
 // Tags Webflow ships with NON-ZERO default margins. A reference that resets margins to 0 must say so
 // explicitly for these, or the Webflow default silently applies. See the margin block in authoredProps.
-const WF_MARGIN_DEFAULT_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'blockquote', 'figure', 'pre']);
+// WEBFLOW'S OWN BASE STYLESHEET (v2.1.17) — the single largest source of "built does not equal reference".
+//
+// Webflow ships a normalize + component stylesheet. Any property it sets is NON-ZERO by default, so a
+// property the reference computes as 0 — which the compiler therefore omits — does NOT come out as 0 on
+// the page. Webflow's value wins. "Absent from the plan" means "Webflow decides".
+//
+// Measured cost of learning this the hard way, in ONE session (2026-08-22):
+//   h3 20px top / ul 10px bottom margins  -> a card 30px too tall
+//   .w-dropdown-toggle padding 20px       -> a 28px nav bar rendered 40px
+//   .w-dropdown margin-left/right auto    -> flex siblings sized unevenly
+// Three publishes, one root cause. This is not a Dropdown bug or a heading bug: it is a CLASS of bug that
+// recurs on every new site, because every site uses some native module.
+//
+// The rule: for any tag or module Webflow is known to style, author the reference's computed value
+// EXPLICITLY — including zero, and including when the extractor dropped it for being zero.
+const WF_DEFAULTS = {
+  h1: ['margin-top', 'margin-bottom'], h2: ['margin-top', 'margin-bottom'],
+  h3: ['margin-top', 'margin-bottom'], h4: ['margin-top', 'margin-bottom'],
+  h5: ['margin-top', 'margin-bottom'], h6: ['margin-top', 'margin-bottom'],
+  p: ['margin-top', 'margin-bottom'],
+  blockquote: ['margin-top', 'margin-bottom', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  figure: ['margin-top', 'margin-bottom', 'margin-left', 'margin-right'],
+  pre: ['margin-top', 'margin-bottom'],
+  ul: ['margin-top', 'margin-bottom', 'padding-left'],
+  ol: ['margin-top', 'margin-bottom', 'padding-left'],
+  input: ['margin-top', 'margin-bottom', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'height'],
+  textarea: ['margin-top', 'margin-bottom', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  select: ['margin-top', 'margin-bottom', 'padding-top', 'padding-bottom', 'height'],
+  button: ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  label: ['margin-top', 'margin-bottom'],
+  form: ['margin-top', 'margin-bottom'],
+  fieldset: ['margin-top', 'margin-bottom', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+};
+// Native MODULE defaults, keyed by the element type the compiler emits. These cost a publish each, because
+// the module's own w-class is invisible both in the reference and in the plan.
+const WF_MODULE_DEFAULTS = {
+  Dropdown:       ['margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  DropdownToggle: ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  DropdownLink:   ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  Slider:         ['height', 'background-color'],
+  Tabs:           ['margin-top', 'margin-bottom'],
+  Navbar:         ['padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'background-color'],
+  Form:           ['margin-top', 'margin-bottom'],
+  FormTextInput:  ['margin-bottom', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'height'],
+  FormButton:     ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  Button:         ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  List:           ['margin-top', 'margin-bottom', 'padding-left'],
+  ListItem:       ['margin-top', 'margin-bottom'],
+  Blockquote:     ['margin-top', 'margin-bottom', 'padding-left', 'padding-right'],
+  RichText:       ['margin-top', 'margin-bottom'],
+};
+const WF_MARGIN_DEFAULT_TAGS = new Set(Object.keys(WF_DEFAULTS));
 
 
 // ── Naming is NOT the reference's problem to solve ───────────────────────────────────────────────
@@ -168,6 +219,12 @@ function compile() {
   const maxDepth = Number(opt('max-depth') || 99);
   const d = JSON.parse(fs.readFileSync(src, 'utf8'));
   const nodes = d.nodes || d.elements || [];
+  // Mark which nodes have element children, so the element TYPE can be resolved while properties are being
+  // authored (the Webflow-default reset table keys off the module, not just the tag).
+  for (let i = 0; i < nodes.length; i++) {
+    const nx = nodes[i + 1];
+    nodes[i].__hasKids = !!(nx && typeof nx.depth === 'number' && typeof nodes[i].depth === 'number' && nx.depth > nodes[i].depth);
+  }
   if (!nodes.length) die('extract contains no nodes: ' + src);
 
   const skips = [];
@@ -278,15 +335,19 @@ function compile() {
     // carries this, and it is invisible in the plan because the property simply is not there.
     // So: when the reference computes a zero margin on an element Webflow gives a default to, author the
     // zero EXPLICITLY. An explicit 0 is design intent here, not noise.
-    if (WF_MARGIN_DEFAULT_TAGS.has(String(n.tag || '').toLowerCase())) {
-      for (const side of ['top', 'bottom']) {
-        const k = 'margin-' + side;
+    {
+      const tag = String(n.tag || '').toLowerCase();
+      let wfType = null;
+      try { wfType = typeof typeFor === 'function' ? (typeFor(n, n.__hasKids) || {}).type : null; } catch (e) {}
+      const forced = new Set([...(WF_DEFAULTS[tag] || []), ...(WF_MODULE_DEFAULTS[wfType] || [])]);
+      for (const k of forced) {
+        if (out[k] !== undefined) continue;          // reference has a real value; already authored above
         const raw = (n.styles || {})[k];
-        // ABSENT means zero here. The extractor drops zero-valued properties to keep captures small, so a
-        // reset margin never reaches the plan at all — and "not in the plan" is precisely how Webflow's
-        // 20px default wins. For these tags a computed margin always exists, so absent == 0.
-        const isZero = raw === undefined || parseFloat(raw) === 0;
-        if (out[k] === undefined && isZero) out[k] = '0px';
+        // ABSENT means zero: the extractor drops zero-valued properties to keep captures small, so a reset
+        // never reaches the plan — and "not in the plan" is exactly how Webflow's default wins.
+        const v = raw === undefined ? 0 : parseFloat(raw);
+        if (!isFinite(v)) continue;
+        out[k] = (v === 0) ? '0px' : raw;
       }
     }
 
@@ -362,6 +423,13 @@ function compile() {
           const tracks = String(ps['grid-template-columns'] || '').trim();
           const multiTrack = tracks && tracks.split(/\s+/).length > 1;
           if (/grid/.test(String(ps.display || '')) && multiTrack) { delete out.width; delete out['max-width']; }
+          // A TEXT-bearing child of a FLEX container is shrink-to-fit: its measured width IS its text, not a
+          // constraint anyone authored. Baking it pins a label to the width of the word that happened to be
+          // in it — measured 2026-08-22, an "About" nav label compiled with `max-width: 34px`. A text child
+          // of a BLOCK parent is left alone, because there the width usually is a real authored max-width.
+          if (/flex/.test(String(ps.display || '')) && n.text && String(n.text).trim()) {
+            delete out.width; delete out['max-width'];
+          }
           break;
         }
       }
@@ -507,6 +575,10 @@ function selfTest() {
         styles: { display: 'block', width: '496px', 'background-color': 'rgb(255,255,255)',
           'border-top-width': '1px', 'border-right-width': '1px', 'border-bottom-width': '1px', 'border-left-width': '1px',
           'border-top-style': 'solid', 'border-top-color': 'rgb(227,231,242)' } },
+      // a reset list + heading: the reference computes zero margins, Webflow's defaults are NOT zero
+      { tag: 'ul', depth: 1, path: 'header>ul', class: 'site-nav__menu-list', box: { x: 0, y: 300, w: 300, h: 60 }, styles: { display: 'block' } },
+      { tag: 'li', depth: 2, path: 'header>ul>li', class: 'site-nav__menu-item', text: 'One', box: { x: 0, y: 300, w: 300, h: 20 }, styles: { display: 'list-item' } },
+      { tag: 'h3', depth: 1, path: 'header>h3', class: 'site-nav__title', text: 'Heading here', box: { x: 0, y: 380, w: 300, h: 26 }, styles: { 'font-size': '18px' } },
     ],
   }));
   const run = a => { const r = require('child_process').spawnSync(process.execPath, [__filename, ...a], { encoding: 'utf8' }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') } };
@@ -562,6 +634,18 @@ function selfTest() {
     ['resolved pixel grid tracks become fr again', (() => {
       const g = plan.classes.find(x => x.properties && x.properties['grid-template-columns']);
       return !!g && /fr/.test(String(g.properties['grid-template-columns']));
+    })(), true],
+    // ── Webflow default resets (v2.1.17). Webflow's base stylesheet is non-zero, so a property the
+    //    reference computes as 0 must be authored EXPLICITLY or Webflow's value silently wins. Three
+    //    separate publishes were spent relearning this on 2026-08-22.
+    ['a reset ul authors its zero margins AND Webflow indent explicitly', (() => {
+      const c = plan.classes.find(x => /menu-list$/.test(x.name)) || { properties: {} };
+      return c.properties['margin-top'] === '0px' && c.properties['margin-bottom'] === '0px'
+        && c.properties['padding-left'] === '0px';
+    })(), true],
+    ['a reset heading authors its zero margins explicitly', (() => {
+      const c = plan.classes.find(x => /title$/.test(x.name)) || { properties: {} };
+      return c.properties['margin-top'] === '0px' && c.properties['margin-bottom'] === '0px';
     })(), true],
     ['a child of a multi-track grid does NOT carry the track as its width', (() => {
       const c = plan.classes.find(x => x.properties && x.properties['border-top-width']);
