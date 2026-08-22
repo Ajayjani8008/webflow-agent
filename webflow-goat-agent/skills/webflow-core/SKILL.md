@@ -3,7 +3,7 @@ name: webflow-core
 description: The Webflow GOAT operating rules and the fixed build pipeline. Load this before any Webflow build, rebuild or debug lane (T1/T2/T3) and before any MCP write. Owns the native-only ladder, the effect manifest, the evidence rules, the section pipeline and the batching targets. Not needed for micro-edits, audits or questions.
 ---
 
-# Webflow Core — operating rules (v2.1.14)
+# Webflow Core — operating rules (v2.1.15)
 
 **Priority: Fidelity (nothing simplified) > Native > Visible in Designer > Responsive-scored > Token economy.**
 Reaching full fidelity first time IS the job. The user must never say "force match", "retry" or "you dropped the animation".
@@ -30,6 +30,7 @@ Every T1 section runs this. Deviating costs turns, and turns are the whole cost.
 | 6c | **plan-diff — the only gate that sees an OMISSION** | `node "$WF/scripts/plan-diff.js" verify specs/<section>.plan.json <published-url>` (also runs inside `wf-section verify`). Every other gate verifies what EXISTS: property equality checks the classes you made, the pixel score compares the region you captured, a11y walks the DOM you shipped. So a build that is a SUBSET of its plan passes all of them. Measured 2026-08-07: a 582-node plan shipped as 25 divs / 16 links — **2.7% of its classes, 1.4% of its strings** — with property equality and a11y green. Requires 100% of planned classes and strings on the page. |
 | 7 | **Verify — one call** | `node "$WF/scripts/wf-section.js" verify …` (chains verify-section → dom-contract → plan-diff, and auto-discovers the reference shots). Direct: `node "$WF/scripts/verify-section.js" <url> "<sel>" <outDir> --section= --widths=1440,991,767,390 --ref= --audit --states=…` → every breakpoint shot, every score, a11y/perf, states, in ONE consolidated `EVIDENCE` block. Then `dom-contract.js verify` for property equality. **The primary width is the REFERENCE FRAME width, never the 1440 default** — read it off the reference PNG (`ref-integrity.js`) and pass it as the first `--widths` entry. A 1920-authored frame scored against a 1440 capture compares the design to a reflow of the build that the design never described: the score drifts, real diffs get masked and false ones invented. 1440 is correct only when the reference frame is 1440. |
 | 8 | **Fix** | ONE batched call. Re-check only open items + 3-5 neighbours. |
+| 7b | **The REFERENCE is validated too (v2.1.15)** | `verify-section` now fails with **`REFERENCE INVALID`** when two or more reference frames share a height across different widths — a reflowing page cannot do that, so they are one layout cropped, not per-breakpoint frames. Every gate here assumes the reference is right and blames the build for any difference; measured 2026-08-22, an HTML reference captured with no `<meta name="viewport">` never reflowed and sent a correct build into two rounds of chasing. When this fires, fix the reference and re-capture — do NOT "fix" the build. |
 | 8b | **ANCHOR — the verdict is not final without it** | `verify-section` now prints **`PASS-PENDING-ANCHOR`**, not `PASS`, when every score is clean but the side-by-side has not been recorded, and it **exits 1**. Open the built shot and the reference shot at the primary width, then re-run with `--anchor-seen="<what the comparison actually showed>"` (also accepted by `wf-section verify`). Describe what you SAW, not that you looked. This exists because no script can see a render: on example-header a section scored **98.75% PASS, zero hot regions, `dom-contract` 158/158** with an entire text line missing, and only the eye caught it. If the anchor reveals a diff, fix it — do not pass the flag to move on. |
 | 9 | **Record** | `node "$WF/scripts/wf-section.js" record …` — build_state + registry + spec statuses in one write. It also runs `wf-report.js` and stores the section's **measured** cost (turns · calls · publishes · peak context · minutes) into `build_state.sections[].cost`. A budget nobody measures is a wish: report the `EVIDENCE wf-report` block verbatim whenever it says OVER BUDGET. **A closing status is fail-closed (v2.1.14):** `--status=verified\|responsive` is REFUSED without `--score=<n>` at or above the 99% floor AND `--report=<path\|summary>`. Before this gate a bare `record --status=verified` wrote a closing status with nothing behind it and exited 0 — which is how five sections in a real `build_state` came to carry `pixel_score: 0` under `responsive`. A failing score is recorded as `built` with what is still open, never as verified. |
 
@@ -104,7 +105,7 @@ Never claim a capability is missing from memory or a cached tool listing — `ge
 | Figma, first time | `figma-setup` (scoped) → build from `figma-cache/` |
 | Figma, cached | `figma-cache/` → instant. A second fetch of a cached node is a bug |
 | Screenshot | `design-intake` §B for the render study, then **`wf-section intake --screenshot=<png>`** → `shot-compile`: OCR gives every string **with its box**, pixels give text colour, page background, gaps and filled-button detection, and it writes the content inventory itself. **No hand work.** Two honest limits, printed on every run: font FAMILY is unknowable (`--font` names the substitute) and font SIZE is a cap-height estimate ±1px, so **step 3c `text-extents check-spec` is mandatory for this source**; and a still has no states, so behaviour parity needs a URL/HTML reference or a recording — never claimed from an image |
-| HTML delivery | `html-intake` — every html/css/js read end to end, run headless, manifest with exact timings |
+| HTML delivery | `html-intake` — every html/css/js read end to end, run headless, manifest with exact timings. The reference MUST carry `<meta name="viewport" content="width=device-width, initial-scale=1">` or it will not reflow and its "breakpoint frames" are a cropped desktop layout (`verify-section` § REFERENCE INVALID) |
 | Live URL | `url-intake` → `ref-cache/{domain}/`. Third-party → layout/patterns only, never brand assets or copy |
 | **React / Vue / SPA / Storybook** (localhost or deployed) | it is a live URL: `url-intake` → `ref-extract` (waits for hydration) → the SAME `--extract` intake. Hashed/utility class names are expected and handled — class identity comes from role + style fingerprint, never the framework's generated names |
 | Text description | draft spec → confirm → build |
@@ -112,6 +113,8 @@ Never claim a capability is missing from memory or a cached tool listing — `ge
 | Cross-site reuse | `portable-mode` (confirm once) |
 
 Never load the other source's skill or cache for the same job. **Hybrid is legal but declared:** name the roles once in the spec (`primary=figma <node> (layout/content/values) · secondary=url <domain> (behaviour only)`), separate caches, every value tagged, conflicts resolved by the primary.
+
+**The compiler emits design INTENT, not the snapshot (v2.1.15).** A capture is a photograph of one viewport, so `url-compile` now drops computed `height`, re-authors computed-`auto` margins back to `auto`, and refuses to author a width that merely equals the parent's content box or the viewport — while keeping a genuinely narrower constraint as `width:100%` + `max-width`. Before this, a compiled hero carried `height` on all 7 classes, `margin-left/right:120px` and two bogus `max-width`s: 15 properties hand-corrected before the first write, and shipping them unedited breaks every breakpoint. If you still find yourself hand-editing the plan, that is a compiler bug — fix it there, not in the plan.
 
 **Repeats:** a block repeating ≥2× non-editorial → `component-build` (one component + props, never N copied subtrees) · ≥3× editorial → `cms-build` (native Collection List + bindings). Decide at intake.
 
@@ -142,7 +145,7 @@ ignoring `unverifiedStates` · destroying without a snapshot · inventing motion
 surfacing another site's pending items · writing any code without a written descent proof AND a user yes ·
 proposing or self-invoking `/custom-code-once` · reusing a past permission · starting from the reference's DOM instead of the native module map.
 
-Run `node "$WF/scripts/wf-lint.js"` after any pack edit. Run `node "$WF/scripts/wf-preflight.js" <plan.json>` before any build.
+Run `node "$WF/scripts/wf-verify-pack.js"` after any pack edit — ONE command covering wf-lint (structure, budgets, repo parity, **client-identity sweep**), every script self-test, LF line endings and extra-clone parity. Add `--also=<clone> --mirror` to push the repo version into another working copy. Run `node "$WF/scripts/wf-preflight.js" <plan.json>` before any build.
 
 ---
 

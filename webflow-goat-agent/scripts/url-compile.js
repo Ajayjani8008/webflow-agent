@@ -231,10 +231,68 @@ function compile() {
       if (SHORTHAND[k]) { for (const long of SHORTHAND[k]) out[long] = v; continue }
       out[k] = v;
     }
-    // fluid base (Rule 7)
+    // ── SNAPSHOT ARTIFACTS (v2.1.15) ───────────────────────────────────────────────────────────────
+    // A capture is a photograph of ONE viewport, not a design. Several computed values are measurements of
+    // that moment, and authoring them as CSS breaks every other width. Measured 2026-08-22 on a real build:
+    // the compiler emitted `height` on all 7 classes, `margin-left/right: 120px` (the computed value of
+    // `auto`), `max-width: 1440px` (the viewport itself) and `max-width: 1136px` (the parent's content box).
+    // Fifteen properties had to be hand-corrected before the first write, and shipping them unedited would
+    // have broken every breakpoint. The compiler must emit design INTENT, never the measurement.
+    const VW = (d.viewport && (d.viewport.width || d.viewport.w)) || 0;
+    const isIntrinsic = INTRINSIC_TAGS.has(n.tag);
+
+    // 1. Computed height is a layout RESULT — content sizes itself. Only intrinsic media keeps a measured box.
+    if (!isIntrinsic) { delete out.height; delete out['min-height']; }
+
+    // 2. `margin: auto` resolves to equal pixel margins in a computed style. That signature is a centred
+    //    block; re-author it as `auto` so it stays centred instead of pinning to one viewport's arithmetic.
+    const ml = out['margin-left'], mr = out['margin-right'];
+    if (ml && mr && ml === mr && /^\d+(\.\d+)?px$/.test(String(ml)) && parseFloat(ml) > 0) {
+      out['margin-left'] = 'auto'; out['margin-right'] = 'auto';
+    }
+
+    // 3. Inherited defaults leaking in: `line-height: normal` is the default, and a colour on a node that
+    //    carries no text is the browser's inherited value — authoring it puts black text on a dark section
+    //    the moment anyone adds a child.
+    if (out['line-height'] === 'normal') delete out['line-height'];
+    if (out.color && !(n.text && String(n.text).trim())) delete out.color;
+
+    // 4. A width equal to the parent's CONTENT box is not a constraint, it is just "block fills its parent".
+    //    Authoring it (and the max-width the fluid rule then derives from it) is what produced the bogus
+    //    `max-width: 1136px`. Only a width genuinely NARROWER than the parent is design intent.
+    const parentInner = (() => {
+      if (!Array.isArray(nodes) || typeof n.depth !== 'number') return VW;
+      const i = nodes.indexOf(n);
+      for (let j = i - 1; j >= 0; j--) {
+        const p = nodes[j];
+        if (typeof p.depth === 'number' && p.depth < n.depth) {
+          const pb = (p.box && p.box.w) || VW;
+          const pad = ['padding-left', 'padding-right']
+            .reduce((s, k) => s + (parseFloat((p.styles || {})[k]) || 0), 0);
+          return Math.max(0, pb - pad);
+        }
+      }
+      return VW;
+    })();
+    const ownW = parseFloat(out.width);
+    //    EQUALITY only, never ">=": a child WIDER than its parent is overflowing on purpose (a bleed, a
+    //    marquee, an oversized card) and that width is real design intent. An earlier cut used ">=" and
+    //    deleted exactly that case — caught by this file's own container-fluidity test.
+    if (!isIntrinsic && out.width && /^\d+(\.\d+)?px$/.test(String(out.width)) &&
+        parentInner && Math.abs(ownW - parentInner) <= 1) {
+      delete out.width;                       // full-bleed inside its parent: say nothing, let it be a block
+      if (out['max-width'] && Math.abs(parseFloat(out['max-width']) - ownW) < 1) delete out['max-width'];
+    }
+    // 5. A max-width equal to the capture viewport is the viewport, not a constraint.
+    if (out['max-width'] && VW && Math.abs(parseFloat(out['max-width']) - VW) < 1) delete out['max-width'];
+
+    // fluid base (Rule 7) — a REAL width constraint becomes width:100% + max-width so it scales down.
+    // It must NOT hand back the viewport width as a max-width: that is the artifact the scrub just removed.
     if (out.width && /^\d+(\.\d+)?px$/.test(String(out.width)) && !INTRINSIC_TAGS.has(n.tag)) {
       const px = String(out.width); out.width = '100%';
-      if (!out['max-width'] || out['max-width'] === 'none') out['max-width'] = px;
+      const isViewport = VW && Math.abs(parseFloat(px) - VW) < 1;
+      if (!isViewport && (!out['max-width'] || out['max-width'] === 'none')) out['max-width'] = px;
+      if (isViewport) delete out.width;      // full-bleed section: a block is already full width
     }
     // Rule 15
     if (INTRINSIC_TAGS.has(n.tag)) {
@@ -310,7 +368,7 @@ function compile() {
   const classes = [...classProps.entries()].map(([name, properties]) => ({ name, properties }));
   const plan = { section, source: d.url || src, mode: 'replica', classes, tree };
   const contract = {
-    section, width: (d.viewport && d.viewport.width) || 1440,
+    section, width: (d.viewport && (d.viewport.width || d.viewport.w)) || 1440,
     elements: classes.filter(c => Object.keys(c.properties).length).map(c => ({
       sel: '.' + c.name,
       expect: Object.fromEntries(Object.entries(c.properties).filter(([k]) =>
@@ -381,6 +439,20 @@ function selfTest() {
     ['proprietary font substituted', flat.includes('Clarkson'), false],
     ['fractional text width dropped', flat.includes('208.4px') || flat.includes('59.44px'), false],
     ['intrinsic img size kept', flat.includes('"width":"24px"'), true],
+    // ── snapshot-artifact scrub (v2.1.15). A capture is a photograph of one viewport; authoring its
+    //    measurements breaks every other width. Each of these shipped in a real compiled plan on 2026-08-22.
+    ['computed height dropped on non-intrinsic elements',
+      plan.classes.some(c => !/-img$/.test(c.name) && c.properties && c.properties.height), false],
+    ['intrinsic media KEEPS its measured height',
+      plan.classes.some(c => /-img$/.test(c.name) && c.properties && c.properties.height === '24px'), true],
+    ['no max-width equal to the capture viewport',
+      JSON.stringify(plan.classes).includes('"max-width":"1440px"'), false],
+    ['a width equal to the parent content box is not authored',
+      plan.classes.some(c => c.properties && c.properties['max-width'] === '1136px'), false],
+    ['a genuinely narrower width IS kept as a fluid constraint',
+      plan.classes.some(c => c.properties && c.properties.width === '100%' && c.properties['max-width'] === '1200px'), true],
+    ['line-height:normal not authored',
+      JSON.stringify(plan.classes).includes('"line-height":"normal"'), false],
     ['image flagged as needing an asset', flat.includes('needsAsset'), true],
     ['container px width becomes fluid 100% + max-width', flat.includes('"width":"100%"') && flat.includes('"max-width"'), true],
     ['transition shorthand expanded (preflight blocks it otherwise)', flat.includes('transition-timing-function'), true],

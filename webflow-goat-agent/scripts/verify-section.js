@@ -48,7 +48,15 @@ const unscoredOk = String(flag('unscored-ok', '') || '').split(',').map(Number).
 const unscoredReason = flag('unscored-reason', null) || 'no reason given';
 const states = flag('states', null);
 const doAudit = !!flag('audit', false);
-const MIN = flag('min', '99'), CELL = flag('cell', '25'), HEIGHT = flag('height', '2');
+// THRESHOLDS have ONE owner: pixel-diff.js. This used to carry its own defaults, which silently shadowed
+// pixel-diff's -- raising the floor in one file changed nothing because the other kept passing the old value
+// (2026-08-22). Only forward what the caller explicitly set; otherwise pixel-diff's own defaults apply.
+const MIN = flag('min', null), CELL = flag('cell', null), HEIGHT = flag('height', null);
+const diffThresholdArgs = [
+  MIN !== null ? `--min=${MIN}` : null,
+  CELL !== null ? `--cell=${CELL}` : null,
+  HEIGHT !== null ? `--height=${HEIGHT}` : null,
+].filter(Boolean);
 // The anchor view (webflow-core Rule 1 / pixel-verify): a global percentage cannot see a small text run and
 // property equality cannot see an element that renders empty. Measured: 98.75% PASS, zero hot regions,
 // dom-contract 158/158 — with an entire text line missing. So a clean score is PASS-PENDING-ANCHOR, never PASS,
@@ -75,6 +83,22 @@ function decideVerdict(failCount, measured, anchorOk) {
   if (!measured) return 'UNVERIFIED';
   if (!anchorOk) return 'PASS-PENDING-ANCHOR';
   return 'PASS';
+}
+
+// Pure so the self-test can assert it. Returns a message when the REFERENCE cannot be right, else null.
+function refFramesInvalid(scores) {
+  const scored = (scores || []).filter(s => s.ref && s.refHeight);
+  if (scored.length < 2) return null;
+  const byH = new Map();
+  for (const s of scored) byH.set(s.refHeight, (byH.get(s.refHeight) || 0) + 1);
+  const [h, n] = [...byH.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (n < 2) return null;
+  const widths = scored.filter(s => s.refHeight === h).map(s => s.width).sort((a, b) => a - b);
+  return `REFERENCE INVALID — ${n} reference frames (${widths.join(', ')}) are all ${h}px tall. ` +
+    'A page that reflows cannot render the same height at different widths, so these are one layout cropped, ' +
+    'not per-breakpoint frames. Every score against them is meaningless. Most common cause: an HTML reference ' +
+    'with no <meta name="viewport" content="width=device-width, initial-scale=1"> — mobile emulation then falls ' +
+    'back to the 980px layout viewport and scales. Fix the reference and re-capture; do NOT "fix" the build.';
 }
 
 function selfTest() {
@@ -106,6 +130,16 @@ function selfTest() {
     ['clean scores without the anchor view do NOT print PASS', decideVerdict(0, true, false) === 'PASS-PENDING-ANCHOR', true],
     ['clean scores WITH the anchor view print PASS', decideVerdict(0, true, true) === 'PASS', true],
     ['a too-short anchor note does not count as having looked', 'ok'.trim().length >= 12, false],
+    // the reference itself is now validated — this is the case that sent a correct build into two rounds of chasing
+    ['identical ref heights across widths = REFERENCE INVALID',
+      /REFERENCE INVALID/.test(refFramesInvalid([
+        { width: 1440, ref: 'a.png', refHeight: 1048 }, { width: 991, ref: 'b.png', refHeight: 1048 },
+        { width: 390, ref: 'c.png', refHeight: 1048 }]) || ''), true],
+    ['a genuinely reflowing reference is accepted',
+      refFramesInvalid([{ width: 1440, ref: 'a.png', refHeight: 1048 },
+        { width: 767, ref: 'b.png', refHeight: 1176 }, { width: 390, ref: 'c.png', refHeight: 1552 }]) === null, true],
+    ['one width alone is never flagged',
+      refFramesInvalid([{ width: 1440, ref: 'a.png', refHeight: 1048 }]) === null, true],
   ];
   for (const [name, got, want] of cases) {
     const pass = got === want; ok = ok && pass;
@@ -219,10 +253,10 @@ async function captureAll() {
         else report.fails.push(`@${s.width} UNSCORED and NOT declared — either supply ${section}-${s.width}.png or declare it: --unscored-ok=${s.width} --unscored-reason="the source has no frame at this width" (Rule G)`);
         continue;
       }
-      const r = await run('pixel-diff.js', [ref, s.file, path.join(outDir, `${section}-${s.width}-diff.png`), '--json', `--min=${MIN}`, `--cell=${CELL}`, `--height=${HEIGHT}`]);
+      const r = await run('pixel-diff.js', [ref, s.file, path.join(outDir, `${section}-${s.width}-diff.png`), '--json', ...diffThresholdArgs]);
       let j = null; try { j = JSON.parse(r.out) } catch (e) {}
       if (!j) { report.scores.push({ width: s.width, verdict: 'ERROR', reason: r.err || 'pixel-diff produced no JSON' }); report.fails.push(`@${s.width} score could not be computed: ${r.err || 'no output'}`); continue }
-      report.scores.push({ width: s.width, verdict: j.verdict, match: j.match, heightDeltaPct: j.heightDeltaPct, hotCells: j.hotCells, worst: j.worst, ref, fails: j.fails });
+      report.scores.push({ width: s.width, verdict: j.verdict, match: j.match, heightDeltaPct: j.heightDeltaPct, hotCells: j.hotCells, worst: j.worst, ref, refHeight: j.refHeight || j.heightRef || null, fails: j.fails });
       j.fails.forEach(f => report.fails.push(`@${s.width} ${f}`));
     }
   } else report.fails.push('no --ref given: shots were captured but NOTHING was scored. A section cannot be ' +
@@ -254,6 +288,16 @@ async function captureAll() {
       (j.blankWarning || []).forEach(s => report.fails.push(`state "${s}" captured blank`));
     }
   }
+
+  // ── THE REFERENCE ITSELF IS NEVER VALIDATED (v2.1.15) ────────────────────────────────────────────
+  // Every gate here assumes the reference is correct and blames the build for any difference. Measured
+  // 2026-08-22: an HTML reference captured without a <meta name="viewport"> never reflowed, so all four
+  // "breakpoint frames" were the 1440 layout cropped to narrower widths — identical heights at 1440 and
+  // 390, which is impossible for a responsive page. verify-section faithfully reported "@390 height delta
+  // 53.8%" as a BUILD failure and sent a correct build into two rounds of chasing. A reference that cannot
+  // be right must fail loudly here, not quietly become the thing everything is measured against.
+  const refProblem = refFramesInvalid(report.scores);
+  if (refProblem) report.fails.push(refProblem);
 
   const measured = report.scores.some(x => x.verdict === 'PASS' || x.verdict === 'FAIL');
   const anchorOk = anchorSeen.length >= 12;

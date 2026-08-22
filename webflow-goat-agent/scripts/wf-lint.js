@@ -209,6 +209,62 @@ if (exists(REPO)) {
   }
 } else warn('repo-missing', 'repo copy not found — parity unchecked', REPO);
 
+// ---------- 5b. NO CLIENT IDENTITY IN THE DISTRIBUTED PACK (v2.1.15) ----------
+// The pack is built for ANY site, so it must not ship the name of one. Enforced here because doing it by
+// hand failed three times in a single day (2026-08-22): each sweep searched a list of names written from
+// memory rather than the real set, so `covilla-page-design` survived two passes and a staging subdomain
+// survived three. The real set is on disk — every site the agent has ever resolved has a state dir — so
+// the check reads THAT and greps the pack for it. A name nobody remembered is still caught.
+{
+  const ids = new Set();
+  const sitesDir = path.join(MEM, 'sites');
+  if (exists(sitesDir)) {
+    for (const d of fs.readdirSync(sitesDir)) {
+      if (d === '_template') continue;
+      ids.add(d);
+      const bs = path.join(sitesDir, d, 'build_state.json');
+      if (!exists(bs)) continue;
+      try {
+        const st = JSON.parse(read(bs));
+        for (const v of [st.site && st.site.id, st.site && st.site.name, st.site && st.site.shortName]) {
+          if (typeof v === 'string' && v.trim().length >= 4 && !/^unverified/i.test(v)) ids.add(v.trim());
+        }
+      } catch (e) { /* a malformed state file is reported elsewhere */ }
+    }
+  }
+  // scan the REPO (what actually ships), falling back to the live pack when no repo is configured
+  const scanRoot = exists(REPO) ? REPO : PACK;
+  const targets = [];
+  (function walk(dir, depth) {
+    if (depth > 6 || !exists(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (['node_modules', '.git', '.cache', 'sites'].includes(e.name)) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p, depth + 1);
+      else if (/\.(md|js|json)$/.test(e.name)) targets.push(p);
+    }
+  })(scanRoot, 0);
+
+  const hits = [];
+  for (const f of targets) {
+    const body = read(f);
+    if (!body) continue;
+    for (const id of ids) {
+      if (body.toLowerCase().includes(id.toLowerCase())) hits.push([path.relative(scanRoot, f), id]);
+    }
+    const sub = body.match(/[a-z0-9][a-z0-9-]{2,}\.webflow\.io/gi) || [];
+    for (const s of sub) if (!/^(your-site|example|site|x)\./i.test(s)) hits.push([path.relative(scanRoot, f), s]);
+  }
+  const seen = new Set();
+  for (const [file, id] of hits) {
+    const k = file + '|' + id;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    err('client-identity-in-pack', `the pack ships a real site identifier ("${id}") — it must be site-agnostic; anonymise it (rename, never delete the measured evidence)`, file);
+  }
+  if (!ids.size) warn('site-list-empty', 'no site state dirs found, so the client-identity sweep had nothing to match against', 'sites');
+}
+
 // ---------- 6. verification scripts present ----------
 for (const s of ['shot-el.js', 'state-shot.js', 'motion-verify.js', 'pixel-diff.js', 'ref-extract.js',
   'verify-section.js', 'page-audit.js', 'dom-contract.js', 'ref-integrity.js', 'ref-digest.js',

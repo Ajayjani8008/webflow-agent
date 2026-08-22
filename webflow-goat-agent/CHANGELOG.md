@@ -2,6 +2,71 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.15 — 2026-08-22
+
+The first real build on the v2.1.14 pack. It produced a correct section — and it caught three defects in the
+pack itself, two of which could pass a gate while measuring nothing. Everything below was found by USING the
+agent, not by reading it.
+
+**1. `text-extents` was blind to dark themes — a gate that could not fail.** Ink was "pixels darker than
+`thresh`", an unstated assumption of dark text on a light page. On a `#0b1020` section every background pixel
+qualified, so every band returned the full image width. `bands` compares reference against built: both sides
+read full-width, the widths matched, **PASS**. It would have certified a blank section. Polarity is now derived
+per band from its own modal background, so light-on-dark, dark-on-light and mid-grey all measure. Three
+regression cases, including that an empty band on a dark page is still *blank* rather than "all ink" — the
+assertion the old code fails outright.
+
+**2. The compiler emitted the SNAPSHOT, not the design.** A capture is a photograph of one viewport. On a real
+build `url-compile` emitted `height` on all 7 classes, `margin-left/right: 120px` (the computed value of
+`auto`), `max-width: 1440px` (the viewport itself) and `max-width: 1136px` (the parent's content box) — 15
+properties hand-corrected before the first write, and shipping them unedited breaks every breakpoint. Now:
+computed `height` is dropped on everything except intrinsic media · equal pixel margins are re-authored as
+`auto` · a width equal to the parent's content box or the viewport is not authored at all · a genuinely
+narrower width still becomes `width:100%` + `max-width`. The rule is EQUALITY, never `>=` — a child wider than
+its parent is bleeding on purpose, and an earlier cut of this deleted exactly that case (caught by the file's
+own container-fluidity test). Six regression cases.
+Fixing it surfaced a second bug: `ref-extract` writes `viewport: {w}` and `url-compile` read `viewport.width`,
+so the viewport rules silently never fired **and** the contract's recorded width was falling back to 1440 by
+luck — which `dom-contract` now trusts.
+
+**3. Nothing validated the REFERENCE.** Every gate assumes the reference is right and blames the build for any
+difference. An HTML reference captured with no `<meta name="viewport">` never reflowed, so all four "breakpoint
+frames" were the 1440 layout cropped — identical heights at 1440 and 390, which a reflowing page cannot do.
+`verify-section` reported "@390 height delta 53.8%" as a BUILD failure and sent a correct build into two rounds
+of chasing. It now fails with **`REFERENCE INVALID`** when two or more frames share a height across different
+widths, and says to fix the reference rather than the build. `pixel-diff` emits `refHeight`/`builtHeight` so the
+check has something to read.
+
+**4. Three smaller gates that were lying.**
+- `dom-contract` ran at `@1920` against a contract captured at 1440 and reported ten height DEVIATIONS that were
+  pure artifact. It now inherits the contract's own recorded width; `--width` still overrides.
+- `verify-section` carried its OWN `--min/--cell/--height` defaults that shadowed `pixel-diff`'s, so raising the
+  floor in one file changed nothing. `pixel-diff` is now the single owner; only an explicit flag is forwarded.
+- `wf-section record` printed `607 turns · 285 calls · OVER BUDGET` for a section that cost ~25 calls, because
+  `wf-report` counts the whole transcript unless `--since` is given. A budget verdict computed from the wrong
+  denominator trains you to ignore the gate, so it is now only rendered as a verdict when the measurement was
+  actually scoped, and says so plainly when it was not.
+
+**5. `wf-lint` now enforces site-agnosticism against the real site list.** Doing it by hand failed three times in
+one day: each sweep searched names written from memory rather than the real set, so one client site survived two
+passes and a staging subdomain survived three. The real set is on disk — every site the agent has resolved has a
+state dir — so the check reads THAT, plus any `*.webflow.io` host, and greps what actually ships. A name nobody
+remembered is still caught. Verified by planting one and watching it fail.
+
+**6. `wf-verify-pack.js` — one command that says whether the pack is shippable.** lint (structure, budgets, repo
+parity, identity sweep) · every script self-test · LF line endings · extra-clone parity. Validating a pack edit
+used to be four commands run from memory, ten times in a session; the one skipped is the one that catches the
+regression, and that session shipped CRLF into eight files and re-introduced a client identifier by syncing the
+wrong way round. `--also=<clone> --mirror` copies the repo version into another working copy, which removes the
+manual N-root propagation that caused both.
+
+Not fixed, and worth knowing: a `file://` reference and a published Webflow page can resolve DIFFERENT cuts of a
+font under an identical `font-family` — measured 6.72% wider glyphs with every declared property matching, which
+caps the pixel score in the mid-90s regardless of layout correctness. See `impossible_cases.md`; the fix is to
+put the same font file on both sides, not to chase it with publishes.
+
+`wf-verify-pack` OK · wf-lint 0/0 · 13/13 self-tests · all LF · three roots identical.
+
 ## v2.1.14 — 2026-08-22
 
 "My live agent lost quality and cannot give a better result." Diagnosed by diffing the live pack against

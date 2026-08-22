@@ -398,10 +398,21 @@ function record() {
   const lines = ['EVIDENCE wf-section record  section=' + section,
     '  status    ' + sec.status + (sec.pixel_score ? '   score ' + sec.pixel_score : ''),
     '  state     ' + statePath];
-  if (sec.cost) lines.push('  cost      ' + sec.cost.turns + ' turns · ' + sec.cost.calls + ' calls · ' +
-    sec.cost.publishes + ' publishes · peak ' + Math.round(sec.cost.peakContext / 1000) + 'k' +
-    (sec.cost.minutes != null ? ' · ' + sec.cost.minutes + ' min' : '') +
-    ((sec.cost.calls > 25 || sec.cost.turns > 35 || sec.cost.publishes > 2) ? '   OVER BUDGET — paste the wf-report block in the section report' : '   within budget'));
+  // A cost measured over the WHOLE transcript is not this section's cost. Without --since, wf-report counts
+  // every turn in the session -- it once printed "607 turns / 285 calls / OVER BUDGET" for a section that cost
+  // ~25 calls (2026-08-22). A budget verdict computed from the wrong denominator trains you to ignore the gate,
+  // so it is only rendered as a verdict when the measurement was actually scoped to this section.
+  if (sec.cost) {
+    const scoped = !!opt('since');
+    const over = sec.cost.calls > 25 || sec.cost.turns > 35 || sec.cost.publishes > 2;
+    lines.push('  cost      ' + sec.cost.turns + ' turns · ' + sec.cost.calls + ' calls · ' +
+      sec.cost.publishes + ' publishes · peak ' + Math.round(sec.cost.peakContext / 1000) + 'k' +
+      (sec.cost.minutes != null ? ' · ' + sec.cost.minutes + ' min' : '') +
+      (scoped ? (over ? '   OVER BUDGET — paste the wf-report block in the section report' : '   within budget') : ''));
+    if (!scoped) lines.push('  cost NOTE  measured over the WHOLE session, not this section — not comparable to the ' +
+      'per-section budget. Re-run with --since="<the prompt that started this section>" for a scoped number.');
+    sec.cost.scoped = scoped;
+  }
 
   const reg = opt('registry');
   if (reg) {

@@ -43,7 +43,11 @@ const argv = process.argv.slice(2);
 const pos = argv.filter(a => !a.startsWith('--'));
 const flag = (n, d) => { const f = argv.find(x => x === `--${n}` || x.startsWith(`--${n}=`)); return f === undefined ? d : (f.includes('=') ? f.split('=').slice(1).join('=') : true); };
 const mode = pos[0];
-const W = +flag('width', 1920), MOB = !!flag('mobile', false), PORT = +flag('port', 9290), JSONOUT = !!flag('json', false);
+// WIDTH: the contract records the viewport it was captured at. Comparing a 1440-captured contract against a
+// 1920 render reports every wrapped-text height as a DEVIATION that is pure artifact — measured 2026-08-22, ten
+// false deviations on a correct build. So an explicit --width wins, else the contract's own width, else 1920.
+let W = flag('width', null) === null ? null : +flag('width', 1920);
+const MOB = !!flag('mobile', false), PORT = +flag('port', 9290), JSONOUT = !!flag('json', false);
 if (!['verify', 'emit'].includes(mode)) {
   console.error('usage: node dom-contract.js verify <url> <contract.json> [--width= --mobile --port= --json]');
   console.error('       node dom-contract.js emit   <url> <rootSelector> <out.json> [--width= --props=]');
@@ -188,6 +192,11 @@ const get = p2 => new Promise((res, rej) => { http.get({ host: '127.0.0.1', port
   const cFile = pos[2];
   if (!cFile || !fs.existsSync(cFile)) bail(2, 'ERR contract not found: ' + cFile);
   const contract = JSON.parse(fs.readFileSync(cFile, 'utf8'));
+  if (W === null) {
+    W = +contract.width || 1920;
+    if (contract.width) console.log('  width     ' + W + 'px   (inherited from the contract; pass --width to override)');
+    else console.log('  width     1920px  (contract records no width — pass --width=<reference frame> to compare like with like)');
+  }
   const els = contract.elements || [];
   const propSet = [...new Set(els.flatMap(e => Object.keys(e.expect || {}).filter(k => k !== 'box')))];
   const sels = els.map(e => e.sel);

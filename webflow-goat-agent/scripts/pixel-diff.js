@@ -124,6 +124,9 @@ const verdict = fails.length ? 'FAIL' : 'PASS';
 const result = {
   verdict, match: +pct.toFixed(2), mismatchedPx: mismatched, comparedAt: `${w}x${h}`,
   original: orig, heightDeltaPct: +hDeltaPct.toFixed(2),
+  // emitted so callers can sanity-check the REFERENCE itself: reference frames that share a height across
+  // different widths are one layout cropped, not per-breakpoint frames (verify-section § reference invalid)
+  refHeight: hRef, builtHeight: hBuilt,
   thresholds: { min: MIN_MATCH, cell: CELL_MAX, height: HEIGHT_MAX },
   hotCells: hotCells.slice(0, 8).map(c => ({ where: c.where, box: c.box, pct: +c.pctCell.toFixed(1), px: c.n })),
   worst: ranked.slice(0, 5).map(c => ({ where: c.where, box: c.box, pct: +c.pctCell.toFixed(1), px: c.n })),

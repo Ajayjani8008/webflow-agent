@@ -59,7 +59,7 @@ Shared across sites: `impossible_cases.md` (what Webflow genuinely can't do nati
 **Health checks you can run yourself, any time** — absolute path, one command, nothing before it (`~` and `$WF` cost you an approval prompt each, because a permission rule matches a literal prefix):
 ```
 node /abs/path/docs/memory/webflow/scripts/wf-doctor.js   # is the environment sane? is any section's state lying?
-node /abs/path/docs/memory/webflow/scripts/wf-lint.js     # do the agent's own rules point at real files?
+node /abs/path/docs/memory/webflow/scripts/wf-verify-pack.js  # is the pack shippable? lint + every self-test + line endings + clone parity
 bash /abs/path/docs/memory/webflow/scripts/wf-sync.sh     # is the git backup up to date with the live pack?
 ```
 All read-only. `wf-lint` must say `PASS: 0 errors, 0 warnings` — anything else means a rule is silently doing nothing, and that's worth telling me about.
