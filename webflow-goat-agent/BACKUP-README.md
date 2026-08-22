@@ -17,6 +17,7 @@ Pixel-perfect, native-only Webflow build agent (Figma / screenshot / HTML / **li
 | `docs-memory/*` | `~/docs/memory/webflow/` | registry.md (fresh single-file template), pending_designer_work.md, impossible_cases.md, error_learnings.md (incl. merged v5 lessons), scripts: shot.js / shot-el.js / ref-extract.js / pixel-diff.js / motion-verify.js / **state-shot.js (new v1.7.0 — interaction-state shots for behaviour parity)** |
 | `rules/webflow-core.md` | `~/.claude/rules/webflow/core.md` | 8-line GOAT router (replaces retired 85-line v5 orchestrator) |
 | `rules/common-agents.md` | `~/.claude/rules/common/agents.md` | Platform routing — Webflow rows point to webflow-goat |
+| `settings-permissions.json` | MERGE into `~/.claude/settings.json` (never replace it) | The permission rules the pack's own gates need in order to run without an approval prompt per step. Substitute `<SCRIPTS>` with your absolute scripts path; on Windows keep BOTH slash directions. Without this every pipeline script prompts, and a denied prompt is a skipped gate |
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy, Encircle build notes |
 
 After restore: `npm i ws pngjs pixelmatch --no-save` at `~` (screenshot/extract/pixel-diff scripts need them) + Google Chrome installed (scripts auto-detect: Windows `Program Files` path / Mac `Applications` path / Linux `google-chrome` on PATH).

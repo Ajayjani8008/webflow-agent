@@ -1,0 +1,79 @@
+{
+  "_README": [
+    "Permission rules this pack NEEDS in order to run its own gates without an approval prompt per step.",
+    "",
+    "MERGE these into the permissions.allow array of ~/.claude/settings.json. Do not replace the file:",
+    "it also holds your model, theme, plugins and env. Merge, never overwrite.",
+    "",
+    "WHY THIS FILE EXISTS: v2.1.13 shipped this fix as a paragraph in CHANGELOG.md and nothing else.",
+    "A paragraph is not installable, so the rules never landed on the machine that needed them and every",
+    "pipeline script kept prompting. A denied prompt is a skipped gate, and a skipped gate is how a build",
+    "passes while carrying 1.4% of its reference. Anything the pack requires of its host belongs in a file",
+    "the host can apply, not in prose describing it.",
+    "",
+    "PATHS: replace <SCRIPTS> with the ABSOLUTE path of this pack's scripts dir on your machine, e.g.",
+    "  Windows   C:/Users/you/docs/memory/webflow/scripts",
+    "  macOS     /Users/you/docs/memory/webflow/scripts",
+    "  Linux     /home/you/docs/memory/webflow/scripts",
+    "Keep BOTH slash directions on Windows: the Bash tool emits forward slashes, PowerShell emits",
+    "backslashes, and a permission rule matches a LITERAL prefix (webflow-core § I). One direction alone",
+    "still prompts for half the pipeline.",
+    "",
+    "COMMAND SHAPE still matters after this: the rule only matches when the script is invoked as ONE",
+    "command with the absolute path and nothing before it. `cd $WF/scripts && node x.js`, a $WF variable",
+    "and a ~ path all MISS it, by design."
+  ],
+
+  "permissions": {
+    "allow": [
+      "Bash(node <SCRIPTS>/*)",
+      "Bash(node <SCRIPTS-WINDOWS-BACKSLASH>\\*)",
+
+      "mcp__claude_ai_Webflow__webflow_guide_tool",
+      "mcp__claude_ai_Webflow__ask_webflow_ai",
+      "mcp__claude_ai_Webflow__get_more_tools",
+      "mcp__claude_ai_Webflow__data_agent_instructions_tool",
+      "mcp__claude_ai_Webflow__data_sites_tool",
+      "mcp__claude_ai_Webflow__data_pages_tool",
+      "mcp__claude_ai_Webflow__data_cms_tool",
+      "mcp__claude_ai_Webflow__data_assets_tool",
+      "mcp__claude_ai_Webflow__data_forms_tool",
+      "mcp__claude_ai_Webflow__data_fonts_tool",
+      "mcp__claude_ai_Webflow__data_localization_tool",
+      "mcp__claude_ai_Webflow__data_webhook_tool",
+      "mcp__claude_ai_Webflow__data_sitemap_tool",
+      "mcp__claude_ai_Webflow__data_element_tool",
+      "mcp__claude_ai_Webflow__data_element_builder",
+      "mcp__claude_ai_Webflow__data_element_settings_tool",
+      "mcp__claude_ai_Webflow__data_component_tool",
+      "mcp__claude_ai_Webflow__data_component_builder",
+      "mcp__claude_ai_Webflow__data_component_props_tool",
+      "mcp__claude_ai_Webflow__data_component_variants_tool",
+      "mcp__claude_ai_Webflow__data_style_tool",
+      "mcp__claude_ai_Webflow__data_variable_tool",
+      "mcp__claude_ai_Webflow__element_snapshot_tool",
+      "mcp__claude_ai_Webflow__designer_tool",
+      "mcp__claude_ai_Webflow__asset_tool",
+      "mcp__claude_ai_Webflow__get_asset_preview",
+
+      "mcp__claude_ai_Figma__get_design_context",
+      "mcp__claude_ai_Figma__get_metadata",
+      "mcp__claude_ai_Figma__get_screenshot",
+      "mcp__claude_ai_Figma__get_variable_defs",
+      "mcp__claude_ai_Figma__download_assets"
+    ],
+
+    "deny": [
+      "mcp__claude_ai_Webflow__data_whtml_builder",
+      "mcp__claude_ai_Webflow__data_scripts_tool"
+    ]
+  },
+
+  "_DENY_README": [
+    "The two denied tools are Invariant 1 (native only) enforced by the harness rather than by the agent's",
+    "own restraint. data_whtml_builder injects raw HTML; data_scripts_tool registers custom scripts. Neither",
+    "has a legitimate use in a native build, and a rule the harness enforces cannot be argued away under",
+    "context pressure. Keep them denied even when a build feels stuck — the answer is a tier descent",
+    "(build-reference § EFFECT FIDELITY LADDER), not an escape hatch."
+  ]
+}

@@ -84,11 +84,23 @@ check is green. Separately, `wf-preflight --self-test` exited 1 on `site initial
 preparing the pack for GitHub, not a code bug, but it made the pack's own health check red, and § A step 0 says a
 gate that looks broken gets skipped. Fixed.
 
-**Still open, and it needs the user:** the v2.1.13 permission fix only half-landed. `~/.claude/settings.json` has no
-`Bash(node <abs>/scripts/*)` prefix rule and is missing `data_element_settings_tool`,
-`data_component_props_tool` and `data_component_variants_tool`, so every pipeline script call still prompts —
-prompts get denied, gates get skipped, and prose loses under context pressure. That file cannot be edited by the
-agent (the harness blocks permission self-expansion, correctly).
+**8. The permission fix, which v2.1.13 shipped as prose and therefore did not ship at all.** `~/.claude/settings.json`
+had no `Bash(node <abs>/scripts/*)` prefix rule and was missing `data_element_settings_tool`,
+`data_component_props_tool` and `data_component_variants_tool` — so every pipeline script call still prompted,
+prompts got denied, gates got skipped, and prose lost under context pressure. Applied to the live machine (both
+slash directions: the Bash tool emits forward slashes, PowerShell emits backslashes, and a rule matches a LITERAL
+prefix, so one direction alone still prompts for half the pipeline).
+
+The deeper fix is **`settings-permissions.json`**, new in the pack root and listed in the `BACKUP-README` restore
+table. v2.1.13 wrote this requirement into a changelog paragraph and nothing else; a paragraph is not installable,
+so it never reached the machine that needed it. Anything the pack requires of its host now ships as a file the host
+can apply. It also carries the two `deny` entries — `data_whtml_builder` and `data_scripts_tool` — because
+Invariant 1 enforced by the harness cannot be argued away under context pressure, and Invariant 1 enforced only by
+the agent's restraint can.
+
+Note the agent could not write this file itself: the harness blocks an agent from widening its own permissions, and
+correctly so. It took an explicit `/update-config` from the user. Any future install needs the same — that is what
+the template and the restore row are for.
 
 `wf-lint` 0/0 · 13/13 script self-tests exit 0 · live, repo and clone byte-identical · all files LF per
 `.gitattributes` (a mid-session patch wrote CRLF into 8 files and was caught by the sync check — that is what the
