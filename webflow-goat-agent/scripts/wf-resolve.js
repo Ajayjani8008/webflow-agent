@@ -31,8 +31,8 @@ const WF = process.env.WF || path.join(os.homedir(), 'docs/memory/webflow');
 const SITES = path.join(WF, 'sites');
 const TEMPLATE = path.join(SITES, '_template');
 
-const TURN_BUDGET = 25;
-const CALL_BUDGET = 15;
+const TURN_BUDGET = 35;
+const CALL_BUDGET = 25;
 const PUBLISH_CAP = 2;
 
 const argv = process.argv.slice(2);

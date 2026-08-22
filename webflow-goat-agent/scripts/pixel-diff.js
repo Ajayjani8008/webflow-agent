@@ -2,13 +2,13 @@
 // pixel-diff.js — quantified visual compare for pixel-verify. STRICT / fail-closed (v1.9.0).
 //
 // Three independent ways to fail, because a single global % hides real defects:
-//   1. global match  < 97%                      → FAIL  (overall drift)
+//   1. global match  < 99%                      → FAIL  (overall drift)
 //   2. height delta  > 2% after width-normalize → FAIL  (was only a note pre-1.9.0: a section 200px too
 //                                                        tall PASSed because the diff cropped it away)
 //   3. any 12x12 cell > 25% mismatched          → FAIL  (one broken component inside a large section stays
 //                                                        under the 3% global budget and used to PASS)
 //
-// Usage: node pixel-diff.js <reference.png> <built.png> [out-diff.png] [--json] [--min=97] [--cell=25] [--height=2]
+// Usage: node pixel-diff.js <reference.png> <built.png> [out-diff.png] [--json] [--min=99] [--cell=25] [--height=2]
 // Prints an EVIDENCE block meant to be pasted verbatim into the pixel-verify report.
 // Exit: 0 = PASS, 1 = FAIL, 2 = usage/IO error.
 // Deps: pngjs, pixelmatch (pinned in ../package.json).
@@ -35,13 +35,13 @@ const flagVal = (name, dflt) => {
   const f = flags.find(x => x.startsWith(`--${name}=`));
   return f ? parseFloat(f.split('=')[1]) : dflt;
 };
-const MIN_MATCH = flagVal('min', 97);        // global %
+const MIN_MATCH = flagVal('min', 99);        // global %
 const CELL_MAX = flagVal('cell', 25);        // % of one grid cell allowed to differ
 const HEIGHT_MAX = flagVal('height', 2);     // % height delta allowed
 const asJson = flags.includes('--json');
 
 if (!refPath || !builtPath) {
-  console.error('Usage: node pixel-diff.js <reference.png> <built.png> [out-diff.png] [--json] [--min=97] [--cell=25] [--height=2]');
+  console.error('Usage: node pixel-diff.js <reference.png> <built.png> [out-diff.png] [--json] [--min=99] [--cell=25] [--height=2]');
   process.exit(2);
 }
 

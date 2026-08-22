@@ -368,7 +368,7 @@ if (SELFTEST) {
   const prefixPlan = p => ({ section: 'x', classes: [{ name: p, properties: { color: '#000' } }, { name: p + '__row', properties: {} }], tree: { type: 'Section', styleNames: [p] } });
   const withArgs = (plan, site, known) => check(plan, { sitePrefix: site, known }).blockers.map(b => b.kind);
   cases.push(['foreign prefix blocked (foreign prefix on example-site-design)', withArgs(prefixPlan('kush-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
-  cases.push(['site initials accepted (nhp)', !withArgs(prefixPlan('nhp-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
+  cases.push(['site initials accepted (esd)', !withArgs(prefixPlan('esd-nav'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
   cases.push(['existing registry prefix accepted (hc)', !withArgs(prefixPlan('hc-hero'), 'example-site-design', 'hc,ns').includes('block-prefix-foreign')]);
   cases.push(['no site-prefix given = check disabled', !withArgs(prefixPlan('kush-nav'), '', '').includes('block-prefix-foreign')]);
 

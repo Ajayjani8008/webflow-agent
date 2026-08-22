@@ -187,7 +187,7 @@ Copies with DOM: structure, text, static image URLs, class styles incl. `:hover`
 | 422 on element | check node table — wrong parent type / missing fields |
 | Style update fails | class exists? property name valid Webflow CSS? |
 | Figma MCP unreachable | REST + `FIGMA_TOKEN`; no token → ask screenshot source |
-| Bridge disconnected | reconnect; persistent → API build + Designer steps for styles |
+| `designer_tool` fails / bridge disconnected | **Usually an idle timeout on a BACKGROUNDED Designer tab, not a failed build.** Writes issued through the data API (`data_element_builder`, `data_style_tool`) land headless and appear the moment the tab is reactivated. **Do not rebuild the section** — that is how a section gets built twice. Share the relaunch link, ask for the tab to be focused, then re-read to confirm before continuing. Genuinely persistent → API build + Designer steps for styles |
 | Build state corrupted | rebuild from Designer: `get_current_page` + snapshot |
 | Tool returns `InputRequiredResult` | not an error — re-call the same tool with `inputResponses` + the echoed state. Decision reserved for the user (code, destructive, publish) → surface verbatim, wait, then retry |
 | Read-back matches the PRE-edit state | suspect a cached result before suspecting the write — re-issue with a different query shape; still stale after the write echoed success → treat as a real failure and rebuild that element |

@@ -2,6 +2,98 @@
 
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
+## v2.1.14 — 2026-08-22
+
+"My live agent lost quality and cannot give a better result." Diagnosed by diffing the live pack against
+`webflow_agent_3.0` (2026-07-10, kept on disk — the pre-v1.11.0 lineage), then running every gate this pack ships.
+
+**The original mistake is v1.11.0, and it was arithmetic.** That release measured "six image views cost 229,373
+tokens" and concluded a PNG costs 5k-66k, so it capped image views at ONE per section and promoted `dom-contract`
+to the PRIMARY accuracy gate. v2.1 already corrected the constant — an image is ~1,540 tokens at any resolution,
+so the original figure was wrong by ~40× — **but not the architecture it justified.** Verification had moved from
+*the render, with eyes, until identical* (what 3.0 did) to *the pack's own compiled spec, to a 97% floor, inside a
+call budget too small to run its own pipeline*. Every gate added since — `content-coverage`, `plan-diff`,
+`text-extents`, the build token — re-detects what looking at the render used to catch for free. This release puts
+the eye back on top and makes the numbers underneath honest.
+
+**1. The eye is back on top of the gate stack.** `verify-section` had two verdicts; it now has four:
+`FAIL` → `UNVERIFIED` → **`PASS-PENDING-ANCHOR`** → `PASS`. A run where every score is clean stops at
+PASS-PENDING-ANCHOR and **exits 1** until `--anchor-seen="<what the side-by-side showed>"` records the anchor view
+(threaded through `wf-section verify` too; same idiom as `--cause=` and `--unscored-reason=`). Rationale, verbatim
+from § F: on kush-header a section scored **98.75% PASS, zero hot regions, `dom-contract` 158/158 property-equality
+PASS — with an entire text line missing.** pixel-diff compares pixels, dom-contract compares properties, plan-diff
+compares inventories; **no script can see a render.** Describe what you SAW, not that you looked, and if the anchor
+reveals a diff, fix it rather than passing the flag to move on. The verdict ladder is now a pure
+`decideVerdict(failCount, measured, anchorOk)` so it is unit-tested without a browser — 5 new self-tests, including
+that a note under 12 characters does not count as having looked. Two rules that contradicted § F were deleted:
+`webflow-core` "do not re-open a width that scored PASS — the measurement is stricter than the eye", and the
+`pixel-verify` row "Do not open the shots."
+
+**2. The pass floor is 99%, not 97%.** At 1440×900 a 97% floor licenses 38,880 differing pixels — a whole headline.
+`verify-section` also carried **its own** `--min=97` default that overrode `pixel-diff`'s, so raising one alone would
+have changed nothing. Both raised, and the prose synced across `pixel-verify`, `responsive-pass`, `webflow-core` and
+`webflow-help`. `pixel-diff.test.js` still behaves as specified on all 5 cases — notably the antialiasing-noise case
+still PASSes at 100%, because `includeAA:false` absorbs hinting; the higher floor costs no false failures.
+
+**3. A closing status is fail-closed.** `wf-section record --status=verified` accepted no score, no report and no
+cost, and exited 0. Measured on a real `build_state`: **five sections carry `pixel_score: 0` under a closing
+status**, two more sit below the pass floor, and **none of the nine has a recorded cost.** A recorded zero is worse
+than an absent score — every report that reads the file prints it as evidence. Now `verified|responsive` is REFUSED
+without `--score=<n>` at or above the floor AND `--report=<path|summary>`; a failing score records as `built` with
+what is still open. Non-closing statuses stay free — the gate is on the claim of doneness, not on bookkeeping.
+A cost that `wf-report` could not measure now prints a WARN instead of vanishing ("the budget line is a claim, not a
+measurement"). `wf-doctor` grew the matching state-drift checks, so the existing lies surface instead of sitting
+invisible: zero-score, below-floor and no-cost, per section.
+
+**4. The budget is reachable, and derived rather than chosen.** `≤15 tool calls` was below the pipeline it mandates:
+§ A steps 0-9 are ~22 calls with **zero** fix iterations, +2 for one fix→re-verify cycle. A budget under its own
+pipeline does not restrain the agent, it teaches it to pick a gate to skip — which is how a build passed every gate
+that ran while carrying 1.4% of its reference. Now **≤25 calls · ≤35 turns**, publishes unchanged at 2 (that gate
+works). Changed in all three places it was hardcoded (`wf-resolve`, `wf-report`, `wf-section`) plus the prose, with
+the derivation written in. Two stale lines reconciled: § A's "budget of 15" is now "the then-budget of 15", and the
+"call floor is ~9" now states it counts MCP-side calls only, not the Bash pipeline.
+
+**5. The primary capture width is the REFERENCE FRAME width, never the 1440 default.** No rule tied them, and every
+skill repeated `--widths=1440,…`. A 1920-authored frame scored against a 1440 capture compares the design to a
+reflow of the build that the design never described: the score drifts, real diffs get masked and false ones invented
+(`pixel-diff` box-filters to a common width, which hides the mismatch rather than reporting it). The 991/767/390
+tail is unchanged — those are Webflow's own breakpoint tiers.
+
+**6. Four facts that 3.0 carried and this pack had lost**, restored as `build-reference § Known traps`:
+- **`.w-button` is Webflow blue until overwritten** — the base class ships a blue `background-color` and white
+  `color`; a variant setting only padding/radius/type inherits both, and `pixel-diff` reports it as ordinary colour
+  drift, which reads like a tolerance problem and gets waived. Every variant class sets its own background AND color.
+- **Gradient text is a child element** — `DOM span` + `background-image` + `background-clip: text` +
+  `color: transparent`, unprefixed, verified working through `data_style_tool`. **Never send `-webkit-*`** (the tool
+  rejects the whole call) — `color: transparent` already does that job. This also resolves a contradiction inside the
+  pack: `webflow-platform` said the unprefixed set works, `pixel-verify` said "API can't set → fallback colour +
+  ledger", and the agent was taking the shortcut and shipping solid where designs had gradient. Fallback is now
+  explicitly post-rejection only.
+- **Absolute children of a container that STACKS need `position: static`** at that breakpoint or they pile onto the
+  stacked content — **with zero horizontal overflow, so the overflow gate stays green.** The `responsive-pass`
+  collapse table had one row conflating this with an absolute element merely bleeding past its parent; split in two.
+- **`designer_tool` failure is usually an idle timeout on a BACKGROUNDED tab, not a failed build** — data-API writes
+  land headless and appear on reactivate. **Do not rebuild the section**; that is how a section gets built twice.
+  Replaces the vague "Bridge disconnected → reconnect" row in `webflow-platform § Error recovery`.
+
+**7. Environment, on Windows.** `wf-doctor` reported OCR unavailable, so every screenshot source fell back to a
+hand-authored plan and hand-authored strings — the exact condition v2.1.12 built `shot-compile` to remove
+(`shot-compile` gates real OCR on macOS Vision; `tesseract` is the portable path). Installed and put on PATH; the
+check is green. Separately, `wf-preflight --self-test` exited 1 on `site initials accepted (nhp)`: the case asserts
+`nhp-` passes for a site named `example-site-design`, whose initials are `esd` — a **sanitization bug** from
+preparing the pack for GitHub, not a code bug, but it made the pack's own health check red, and § A step 0 says a
+gate that looks broken gets skipped. Fixed.
+
+**Still open, and it needs the user:** the v2.1.13 permission fix only half-landed. `~/.claude/settings.json` has no
+`Bash(node <abs>/scripts/*)` prefix rule and is missing `data_element_settings_tool`,
+`data_component_props_tool` and `data_component_variants_tool`, so every pipeline script call still prompts —
+prompts get denied, gates get skipped, and prose loses under context pressure. That file cannot be edited by the
+agent (the harness blocks permission self-expansion, correctly).
+
+`wf-lint` 0/0 · 13/13 script self-tests exit 0 · live, repo and clone byte-identical · all files LF per
+`.gitattributes` (a mid-session patch wrote CRLF into 8 files and was caught by the sync check — that is what the
+byte-for-byte comparison is for).
+
 ## v2.1.13 — 2026-08-07
 
 "I have to approve something every ten seconds, I cannot see what for, and refusing derails the build."

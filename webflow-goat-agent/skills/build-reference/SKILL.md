@@ -204,6 +204,33 @@ Same element type = same timing site-wide (registry `## Interactions`). Touch ig
 
 **Exact over intent (v1.8.0 correction):** when the source *states* timing (HTML/CSS/JS, a reference site's stylesheet, a Figma prototype), the build reproduces those exact numbers — duration, delay, easing curve, iteration, threshold — verified to ±10% (pixel-verify § behaviour parity). "Rebuild the intent" applies ONLY to a source that never specified values (a spoken description), and every filled-in value is labelled `derived`. Copying the source's *code* stays banned; matching its *numbers* is required.
 
+## Known traps — each of these shipped a visible defect before it was written down
+
+**`.w-button` is Webflow blue until you overwrite it.** The base `Button` element carries `.w-button`, which ships
+Webflow's own blue `background-color` and white `color`. A variant class that sets only padding / radius / typography
+**inherits both**, so the button renders blue on a page with no blue in it. `pixel-diff` reports this as ordinary colour
+drift, which reads like a tolerance problem and gets waived. **Every button variant class MUST set its own
+`background-color` explicitly** — a real colour, or `transparent` for outline/ghost — **and its own `color`.** There is
+no "inherit from the design" here; the base class already decided.
+
+**Gradient text is a child element, not a property on the heading.** Webflow has no per-run text fill, so a two-tone or
+gradient headline is built as: heading holds the plain part via `set_text`, then append a **`DOM` `span` child** for the
+accent run. Style the span class with the unprefixed longhands — `background-image: linear-gradient(…)` ·
+`background-clip: text` · `color: transparent`. That combination is verified working through `data_style_tool` (Encircle
+build). **Do not send `-webkit-text-fill-color` or any other `-webkit-*` property — the style tool rejects the whole
+call**, and `color: transparent` already does that job in every browser Webflow targets. Solid mid-gradient fallback +
+ledger entry is the LAST resort, only after the unprefixed set has actually been attempted and rejected — never the
+opening move. Per-character gradients hide in Figma's `styleOverrideTable` and read as solid white in flat JSON: Rule 1,
+the render decides.
+
+**An absolute child of a container that STACKS must be re-flowed at that breakpoint.** When a container positions its
+children absolutely (floating-card cluster, offset badge, layered hero art) and that container becomes
+`flex-direction: column` at tablet/mobile, the absolute children keep resolving against the old box and **pile on top of
+the stacked content** — with zero horizontal overflow, so the overflow gate stays green. Give every absolute child
+`position: static` at the breakpoint where its parent stacks. Distinct from an absolute element merely *bleeding* past
+its parent's edge (`responsive-pass` § collapse table), which is a containment fix, not a re-flow. A reused class system
+often already handles this — verify on the built page, never assume.
+
 ## Impossible cases
 
 Single source of truth: `$WF/impossible_cases.md` (shared across sites; `WF="$HOME/docs/memory/webflow"`). Log new cases there with native alternative. Never force.

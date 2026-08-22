@@ -1,4 +1,4 @@
-# Webflow GOAT — How To Use (v2.1.13)
+# Webflow GOAT — How To Use (v2.1.14)
 
 One agent, everything inline. You give a design source + target page, it builds pixel-perfect native Webflow. This doc = the whole manual.
 

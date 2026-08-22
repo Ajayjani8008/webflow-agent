@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // wf-report.js — measure what a section ACTUALLY cost, from the session transcript.
 //
-// Why: the pack's budget (<=15 tool calls, <=25 turns, <=50k peak context) was being reported from
+// Why: the pack's budget (<=25 tool calls, <=35 turns, <=50k peak context) was being reported from
 // recollection, which is not evidence. The two real sections on record cost 107 and 68 calls — both
 // reported at the time as "over budget" without a number, and one of them was reported as ~80k tokens
 // when the transcript says 961k new / 48M re-read. A budget nobody measures is a wish.
@@ -26,7 +26,7 @@ const argv = process.argv.slice(2);
 const flag = n => argv.includes('--' + n);
 const opt = (n, d = null) => { const p = '--' + n + '='; const a = argv.find(x => x.startsWith(p)); return a ? a.slice(p.length) : d; };
 
-const TURN_BUDGET = 25, CALL_BUDGET = 15, PUBLISH_BUDGET = 2;
+const TURN_BUDGET = 35, CALL_BUDGET = 25, PUBLISH_BUDGET = 2;
 
 function newestTranscript() {
   const root = path.join(os.homedir(), '.claude', 'projects');

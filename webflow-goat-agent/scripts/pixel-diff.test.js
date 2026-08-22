@@ -48,7 +48,7 @@ const IDENTICAL = write('identical', H, base);
 const NOISE = write('noise', H, (x, y) => { const c = base(x, y).slice(); if (((x * 31 + y * 17) % 33) === 0) c[0] = Math.min(255, c[0] + 12); return c; });
 // same content, 200px taller (25% delta) — the crop blind spot
 const TALLER = write('taller', 1000, (x, y) => (y < H ? base(x, y) : [250, 250, 252]));
-// badge never rendered: 1.5% of pixels → 98.5% global, above the 97% bar, but one region is destroyed
+// badge never rendered: 1.5% of pixels → 98.5% global, above the old 97% bar, but one region is destroyed
 const HIDDEN = write('hidden', H, (x, y) => (y >= 250 && y < 330 && x >= 430 && x < 520 ? [250, 250, 252] : base(x, y)));
 // CTA wrong colour: 3.3% → fails globally too (sanity: strictness did not break the basic case)
 const BROKEN = write('broken', H, (x, y) => (y > 600 && y < 700 && x > 40 && x < 200 ? [220, 40, 40] : base(x, y)));

@@ -13,7 +13,9 @@
 //     --ref=<dir>                  reference PNGs, matched as <section>-<width>.png
 //     --states=base,auto,scroll:40 also capture interaction states at the primary width
 //     --audit                      also run page-audit at primary + smallest width
-//     --min=97 --cell=25 --height=2   pixel-diff thresholds (defaults = the strict gate)
+//     --min=99 --cell=25 --height=2   pixel-diff thresholds (defaults = the strict gate)
+//     --anchor-seen="<what the side-by-side showed>"   required to reach PASS; without it a clean run is
+//                                     PASS-PENDING-ANCHOR and exits 1. No script can see what a render looks like.
 //     --json                       machine output only
 //
 // Exit: 0 = every check PASSED · 1 = at least one FAILED · 2 = usage/IO/browser error.
@@ -46,7 +48,12 @@ const unscoredOk = String(flag('unscored-ok', '') || '').split(',').map(Number).
 const unscoredReason = flag('unscored-reason', null) || 'no reason given';
 const states = flag('states', null);
 const doAudit = !!flag('audit', false);
-const MIN = flag('min', '97'), CELL = flag('cell', '25'), HEIGHT = flag('height', '2');
+const MIN = flag('min', '99'), CELL = flag('cell', '25'), HEIGHT = flag('height', '2');
+// The anchor view (webflow-core Rule 1 / pixel-verify): a global percentage cannot see a small text run and
+// property equality cannot see an element that renders empty. Measured: 98.75% PASS, zero hot regions,
+// dom-contract 158/158 — with an entire text line missing. So a clean score is PASS-PENDING-ANCHOR, never PASS,
+// until the side-by-side has actually been looked at and what it showed is recorded here.
+const anchorSeen = String(flag('anchor-seen', '')).trim();
 const asJson = !!flag('json', false);
 const basePort = 9400 + (process.pid % 120);
 
@@ -60,6 +67,16 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 // (caller then falls back to the old byte heuristic rather than skipping the check).
 // Guards the blank rule against the regression it just fixed: a flat-but-real bar must NOT read blank,
 // and a big uniform PNG must. The old `bytes < 7000` rule failed both cases.
+// Pure, so the self-test can assert the verdict ladder without launching a browser.
+// Order matters: a real failure outranks everything; nothing-measured is not a pass; a clean score is
+// still not a pass until the anchor view has been recorded (webflow-core Rule 1).
+function decideVerdict(failCount, measured, anchorOk) {
+  if (failCount) return 'FAIL';
+  if (!measured) return 'UNVERIFIED';
+  if (!anchorOk) return 'PASS-PENDING-ANCHOR';
+  return 'PASS';
+}
+
 function selfTest() {
   let PNG; try { PNG = require('pngjs').PNG } catch (e) { console.error('SKIP self-test: pngjs missing (npm install here)'); process.exit(2) }
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vs-selftest-'));
@@ -83,6 +100,12 @@ function selfTest() {
     ['uniform PNG reads blank', inkRatio(uniform) < 0.001, true],
     ['flat real bar does NOT read blank', inkRatio(flatBar) < 0.001, false],
     ['old byte rule would have failed the real bar', fs.statSync(flatBar).size < 7000, true],
+    // the anchor ladder — the gate that stops a green script verdict from closing a section on its own
+    ['a real failure still outranks the anchor', decideVerdict(1, true, true) === 'FAIL', true],
+    ['nothing measured is never a pass', decideVerdict(0, false, true) === 'UNVERIFIED', true],
+    ['clean scores without the anchor view do NOT print PASS', decideVerdict(0, true, false) === 'PASS-PENDING-ANCHOR', true],
+    ['clean scores WITH the anchor view print PASS', decideVerdict(0, true, true) === 'PASS', true],
+    ['a too-short anchor note does not count as having looked', 'ok'.trim().length >= 12, false],
   ];
   for (const [name, got, want] of cases) {
     const pass = got === want; ok = ok && pass;
@@ -233,8 +256,20 @@ async function captureAll() {
   }
 
   const measured = report.scores.some(x => x.verdict === 'PASS' || x.verdict === 'FAIL');
-  report.verdict = report.fails.length ? 'FAIL' : (measured ? 'PASS' : 'UNVERIFIED');
+  const anchorOk = anchorSeen.length >= 12;
+  report.anchor = { seen: anchorOk, note: anchorSeen || null };
+  report.verdict = decideVerdict(report.fails.length, measured, anchorOk);
   if (report.verdict === 'UNVERIFIED') report.fails.push('nothing was scored at any width — UNVERIFIED is not PASS');
+  else if (report.verdict === 'PASS-PENDING-ANCHOR') {
+    const P = widths[0];
+    const built = path.join(outDir, `${section}-${P}.png`);
+    const refShot = (report.scores.find(x => x.width === P) || {}).ref || '(the reference shot for the primary width)';
+    report.fails.push('every score passed, but the ANCHOR VIEW is not recorded — and a clean score has hidden a ' +
+      'whole missing text line before (98.75%, zero hot regions, property equality 158/158). Open these two side ' +
+      'by side:' + '\n' + '              built: ' + built + '\n' + '              ref:   ' + refShot + '\n' +
+      '            then re-run with --anchor-seen="<what the comparison actually showed>". ' +
+      'Describe what you saw, not that you looked; if it revealed a diff, fix it instead and re-verify.');
+  }
   const jsonPath = path.join(outDir, `${section}-verify.json`);
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
 
@@ -251,6 +286,7 @@ async function captureAll() {
   }
   report.audits.forEach(a => console.log(`  a11y/perf @${a.width}: ${a.verdict}` + (a.a11y ? ` — contrast ${a.a11y.contrastChecked - a.a11y.contrastFailed}/${a.a11y.contrastChecked} · unnamed ${a.a11y.missingName} · alt-missing ${a.a11y.imagesMissingAlt} · images ${a.perf.imageKBTotal}KB · depth ${a.perf.domDepth} · CLS ${a.perf.cls}` : ` (${a.reason})`)));
   if (report.states) console.log(`  states: ${report.states.error ? 'ERROR ' + report.states.error : report.states.captured.join(', ')}`);
+  if (report.anchor && report.anchor.seen) console.log(`  anchor: seen — ${report.anchor.note}`);
   report.fails.forEach(f => console.log(`  FAIL: ${f}`));
   report.warns.forEach(w => console.log(`  warn: ${w}`));
   console.log(`VERDICT: ${report.verdict}   → ${jsonPath}`);

@@ -83,6 +83,25 @@ for (const s of sites) {
       add(`state ${s}: section "${sec.name}" unrecorded`, false,
         'status=in-progress with no measured cost — either it was never built, or it was built and `wf-section record` never ran. Reconcile before building on top of it', false);
     }
+    // A CLOSING status with no score is a claim with no evidence. `record` now refuses to write one
+    // (wf-section § record, v2.1.14), so any that already exist predate the gate and must be reconciled:
+    // re-verify and re-record, or drop the status back to `built` and say what is still open.
+    if (['verified', 'responsive'].includes(sec.status)) {
+      const sc = sec.pixel_score;
+      // pixel_score: 0 is not "no score", it is a recorded ZERO sitting under a closing status — worse than
+      // absent, because every report that reads this file prints it as evidence.
+      if (sc == null || !isFinite(sc) || sc <= 0) {
+        add(`state ${s}: section "${sec.name}" claims "${sec.status}" with ${sc === 0 ? 'a score of 0' : 'no score'}`, false,
+          'a closing status with nothing measured behind it. Re-verify and re-record, or set status=built', false);
+      } else if (sc < 99) {
+        add(`state ${s}: section "${sec.name}" claims "${sec.status}" at ${sc}%`, false,
+          'below the 99% pass floor — recorded before the floor was raised. Re-verify, or drop the status to built', false);
+      }
+      if (!sec.cost) {
+        add(`state ${s}: section "${sec.name}" closed with no measured cost`, false,
+          '`wf-section record` never captured a wf-report block, so "within budget" for this section is unfalsifiable', false);
+      }
+    }
   }
 }
 

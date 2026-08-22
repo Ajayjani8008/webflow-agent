@@ -76,7 +76,7 @@ Order: ① layout (grid cols, flex direction, display) ② typography ③ spacin
 
 1. Capture + score **every** breakpoint in ONE call (v1.10.0) — `node "$WF/scripts/verify-section.js" <published-url> "<sel>" <outDir> --section=<name> --widths=1440,991,767,390 --ref=<ref-dir> --audit` (pixel-verify §0). It reloads per width in a single browser launch and scores each against its reference frame. Single targeted re-check inside a fix pass only: `node "$WF/scripts/shot-el.js" <published-url> <out.png> <W> "<selector>" 1 <port>` — width per breakpoint (390 mobile-P, 767 mobile-L, 991 tablet), `mobile:1` for phone widths (CDP device metrics; `--window-size` does NOT set layout viewport).
 2. **Before that call, put every reference frame in the `--ref` dir** named `<section>-<width>.png` — export the tablet/mobile Figma frames (or copy them from `figma-cache/04-screenshots/{section}--mobile.png`). A width with no reference comes back `UNSCORED`, which is *not* a pass.
-3. **Read the verdict.** Each width must satisfy all three conditions: **≥97% global · height delta ≤2% · no 12×12 cell >25% mismatched** (the v1.9.0 strict gate, identical to desktop). The mobile a11y pass — where touch targets are actually measurable — is the same call's `--audit` at the smallest width. Paste the consolidated `EVIDENCE verify-section` block into the report verbatim; a breakpoint score without it is an unverified claim.
+3. **Read the verdict.** Each width must satisfy all three conditions: **≥99% global · height delta ≤2% · no 12×12 cell >25% mismatched** (the v1.9.0 strict gate, identical to desktop). The mobile a11y pass — where touch targets are actually measurable — is the same call's `--audit` at the smallest width. Paste the consolidated `EVIDENCE verify-section` block into the report verbatim; a breakpoint score without it is an unverified claim.
 4. Any width FAIL → read its named hot-region boxes → §2.1 spacing diff on those classes → ONE batched fix → re-run the single call. Converge; two no-progress passes = STALLED (and STALLED is illegal while a CRITICAL/MAJOR diff is open — pixel-verify §4).
 
 No reference frame for a breakpoint → `UNSCORED`: derived values, the checklist below, **open that shot and check it by eye** (pixel-verify §3 image discipline), and every derived value named in the report.
@@ -95,7 +95,8 @@ No reference frame for a breakpoint → `UNSCORED`: derived values, the checklis
 | Split-card image collapses on mobile stack | image `height: auto` + media `min-height: auto` (§0 trap) |
 | Two-col too narrow tablet | stack 1-col or reduce side padding |
 | Gap too large mobile | gap override per breakpoint |
-| Absolute element bleeds | position: relative at mobile |
+| Absolute element bleeds past its parent | `position: relative` at that breakpoint |
+| Absolute children of a container that now STACKS | `position: static` at that breakpoint — otherwise they pile onto the stacked content with zero horizontal overflow, so the overflow gate stays green (`build-reference` § Known traps) |
 | Hover-only content on touch | verify Webflow hover→tap conversion |
 | Text too small | ≥14px body at mobile |
 | Button too small | pad to 44px min-height (auto, §4) |

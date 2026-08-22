@@ -259,6 +259,10 @@ function verify() {
   if (opt('unscored-ok')) vargs.push('--unscored-ok=' + opt('unscored-ok'));
   if (opt('unscored-reason')) vargs.push('--unscored-reason=' + opt('unscored-reason'));
   if (opt('states')) vargs.push('--states=' + opt('states'));
+  // The anchor view is a human/agent act no script can perform, so it travels as a flag. Without it a clean
+  // run reports PASS-PENDING-ANCHOR and this stage fails — deliberately: a green script verdict must not be
+  // able to close a section on its own (webflow-core Rule 1, § F).
+  if (opt('anchor-seen')) vargs.push('--anchor-seen=' + opt('anchor-seen'));
   if (flag('audit') || !flag('no-audit')) vargs.push('--audit');
 
   console.log('EVIDENCE wf-section verify  section=' + section);
@@ -333,10 +337,34 @@ function record() {
   if (!sec) { sec = { name: section, status: 'built', publishes: 0 }; st.sections.push(sec); }
 
   const VALID = ['planned', 'in-progress', 'built', 'verified', 'responsive', 'blocked'];
+  const CLOSING = ['verified', 'responsive'];   // the two statuses that mean "this section is done"
   const status = opt('status');
   if (status) {
     if (!VALID.includes(status)) die('--status must be one of: ' + VALID.join(' | '));
     sec.status = status;
+  }
+
+  // FAIL-CLOSED ON A CLOSING STATUS (v2.1.14). Before this, `record --section=x --status=verified` wrote
+  // "verified" with no score, no report and no cost, and exited 0 — which is why nine sections in a real
+  // build_state carry a closing status and not one measured number. A status is a claim; a claim needs its
+  // evidence attached at the moment it is written, or it is just prose in a JSON file.
+  const PASS_FLOOR = 99;
+  if (CLOSING.includes(sec.status)) {
+    const raw = opt('score');
+    const n = raw == null ? NaN : Number(raw);
+    const why = [];
+    if (raw == null || !isFinite(n)) why.push('--score=<n> is missing — the pixel score from the verify run');
+    else if (n < 0 || n > 100) why.push('--score=' + raw + ' is not a percentage');
+    else if (n < PASS_FLOOR) why.push('--score=' + n + ' is below the ' + PASS_FLOOR + '% floor — a failing score ' +
+      'cannot be recorded as "' + sec.status + '". Fix the diffs, or record --status=built and say what is open');
+    if (!opt('report')) why.push('--report=<path|summary> is missing — the verify evidence this status rests on');
+    if (why.length) {
+      console.error('EVIDENCE wf-section record — REFUSED   section=' + section + '   status=' + sec.status);
+      why.forEach(w => console.error('  ' + w));
+      console.error('  A closing status without its evidence is the failure mode this gate exists for: every');
+      console.error('  automated gate can be green on a build that is 1.4% of its reference (webflow-core § F).');
+      process.exit(1);
+    }
   }
   if (opt('score')) sec.pixel_score = Number(opt('score'));
   if (opt('node-ids')) sec.node_ids = opt('node-ids').split(',').map(s => s.trim()).filter(Boolean);
@@ -363,6 +391,9 @@ function record() {
       }
     } catch (e) { /* a report is never a gate */ }
   }
+  // A silently absent cost is how "within budget" became unfalsifiable. Never blocking, always visible.
+  if (!sec.cost) console.log('  WARN      cost NOT recorded — wf-report could not read the session transcript. ' +
+    'The budget line in this section report is therefore a claim, not a measurement.');
 
   const lines = ['EVIDENCE wf-section record  section=' + section,
     '  status    ' + sec.status + (sec.pixel_score ? '   score ' + sec.pixel_score : ''),
@@ -370,7 +401,7 @@ function record() {
   if (sec.cost) lines.push('  cost      ' + sec.cost.turns + ' turns · ' + sec.cost.calls + ' calls · ' +
     sec.cost.publishes + ' publishes · peak ' + Math.round(sec.cost.peakContext / 1000) + 'k' +
     (sec.cost.minutes != null ? ' · ' + sec.cost.minutes + ' min' : '') +
-    ((sec.cost.calls > 15 || sec.cost.turns > 25 || sec.cost.publishes > 2) ? '   OVER BUDGET — paste the wf-report block in the section report' : '   within budget'));
+    ((sec.cost.calls > 25 || sec.cost.turns > 35 || sec.cost.publishes > 2) ? '   OVER BUDGET — paste the wf-report block in the section report' : '   within budget'));
 
   const reg = opt('registry');
   if (reg) {
@@ -444,7 +475,17 @@ function selfTest() {
   t('record creates + writes', r.code === 0 && readJSON(path.join(site, 'build_state.json')).sections[0].pixel_score === 98.2, r.out);
   r = run(['record', '--site=' + site, '--section=hero', '--registry=| hero | built |']);
   t('registry line not duplicated', /not duplicated/.test(r.out), r.out);
+  // ── a closing status must arrive with its evidence (v2.1.14) ──
   r = run(['record', '--site=' + site, '--section=hero', '--status=verified']);
+  t('verified without a score is REFUSED', r.code === 1 && /REFUSED/.test(r.out) && /--score/.test(r.out), r.out);
+  r = run(['record', '--site=' + site, '--section=hero', '--status=verified', '--score=98.2', '--report=v.json']);
+  t('verified below the pass floor is REFUSED', r.code === 1 && /below the 99% floor/.test(r.out), r.out);
+  r = run(['record', '--site=' + site, '--section=hero', '--status=verified', '--score=99.4']);
+  t('verified without a report is REFUSED', r.code === 1 && /--report/.test(r.out), r.out);
+  r = run(['record', '--site=' + site, '--section=hero', '--status=built']);
+  t('a non-closing status still records freely', r.code === 0, r.out);
+  r = run(['record', '--site=' + site, '--section=hero', '--status=verified', '--score=99.4', '--report=v.json']);
+  t('verified WITH score + report is accepted', r.code === 0 && readJSON(path.join(site, 'build_state.json')).sections[0].pixel_score === 99.4, r.out);
   t('open [critical] surfaces on verified', /open \[critical\]/.test(r.out), r.out);
   r = run(['record', '--site=' + site, '--section=hero', '--status=done']);
   t('invalid status rejected', r.code === 2, r.out);
@@ -503,4 +544,4 @@ else if (cmd === 'token') token();
 else if (cmd === 'verify') verify();
 else if (cmd === 'record') record();
 else if (cmd === 'assets') assets();
-else die('usage: node wf-section.js <intake|token|verify|record> --site=<dir> --section=<name> …   |   --self-test');
+else die('usage: node wf-section.js <intake|token|verify|record|assets> --site=<dir> --section=<name> …   |   --self-test');

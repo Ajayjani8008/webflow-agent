@@ -32,8 +32,12 @@ That combined pass finds real defects → fix them in ONE batch → **one verifi
 
 ```
 node "$WF/scripts/verify-section.js" <published-url> "<builtSel>" <outDir> \
-     --section=<name> --widths=1440,991,767,390 --ref=<reference-shot-dir> --audit [--states=base,auto,scroll:40]
+     --section=<name> --widths=<REF-FRAME-W>,991,767,390 --ref=<reference-shot-dir> --audit [--states=base,auto,scroll:40]
 ```
+
+**A clean score is `PASS-PENDING-ANCHOR`, not `PASS`.** `verify-section` withholds the PASS verdict (and exits 1) until `--anchor-seen="<what the side-by-side showed>"` records the anchor view. That is not ceremony: **no script can see a render.** The differ compares pixels, `dom-contract` compares properties, `plan-diff` compares inventories — and all three were green on a section with a whole text line missing (98.75%, zero hot regions, 158/158). Describe what you SAW; if the anchor revealed a diff, fix it and re-verify rather than passing the flag to move on.
+
+**The first `--widths` entry is the reference frame's own width, not the 1440 default.** Read it off the reference PNG (`ref-integrity.js` reports it) and pass it. A 1920-authored frame scored against a 1440 capture is comparing the design to a reflow of the build the design never described — the score drifts, real diffs get masked and false ones get invented. Use 1440 only when the reference frame is 1440. The 991/767/390 tail stays fixed: those are Webflow's own breakpoint tiers.
 
 Every breakpoint shot (one browser launch, reload per width), every pixel-diff against its reference frame, the a11y/perf audit at desktop + phone, and the interaction states — **one tool call, one consolidated `EVIDENCE verify-section` block, one JSON.** Same scripts, same strict thresholds, same fail-closed verdicts underneath; nothing about accuracy changes.
 
@@ -176,7 +180,7 @@ node "$WF/scripts/pixel-diff.js"    ref-cache/…/{sec}-hover-x.png built/{sec}-
 
 Match states by visual role AND position (reference `.btn` ↔ built `.hero__cta`; repeated blocks: same index — `auto` hovers the FIRST match on each side, so compare card 1 to card 1). Never by selector name.
 
-- [ ] **Every hover/focus/active state in the manifest has a state shot on both sides**, scored ≥97% like the resting shot. Missing state on the built side = the effect was not built, regardless of the base score
+- [ ] **Every hover/focus/active state in the manifest has a state shot on both sides**, scored ≥99% like the resting shot. Missing state on the built side = the effect was not built, regardless of the base score
 - [ ] **Hover DELTA exists:** built `base ↔ hover` differs in the same regions the reference's `base ↔ hover` differs. Identical base/hover on the built side = dead hover (transition on the wrong class, or state never set)
 - [ ] **Scroll states match:** reveals fired, parallax/sticky offsets landed, nothing stuck at `opacity: 0` (compare `scroll-*` shots; also `initialStateFlash` in the motion JSON)
 - [ ] **Timing parity:** each animated row's `durationDeclaredMs` (built) == the reference value ±10% for CSS-owned motion; panel-owned motion has no declared duration → require `moved: true` + observed within ±40% (motion-build § Phase 5). Easing keyword/curve matches the manifest
@@ -220,7 +224,7 @@ LIGHT tier = sets 2+3 only, plus the spec's layout/type/color values. FULL tier 
 **Pre-check (from the RENDER IS GROUND TRUTH rule):** the reference render was studied BEFORE building — per-char gradients, blurs, shadows, overlaps, wrap points are already in the spec. Verify each of those flagged features explicitly here; values-only diff misses them.
 
 **Automated (primary):** reference image vs built shot, side by side, scan order §0. **Quantified score:** `node "$WF/scripts/pixel-diff.js" <reference.png> <built.png>` → prints an `EVIDENCE pixel-diff` block. **Three independent PASS conditions, all required (v1.9.0, fail-closed):**
-1. **global match ≥97%** (antialiasing + font-hinting tolerance built in; both images normalized to the same width by area-average downscale),
+1. **global match ≥99%** (antialiasing + font-hinting tolerance built in; both images normalized to the same width by area-average downscale),
 2. **height delta ≤2%** — a section that is 200px too tall used to PASS because the diff cropped it away; it now FAILs,
 3. **no 12×12 grid cell >25% mismatched** — one destroyed component inside a big section stays under the 3% global budget; it now FAILs by region even at 98.5% global.
 
@@ -237,7 +241,7 @@ v1.11.0 claimed 5k-66k per PNG and rationed looking on that basis. That figure w
 | Situation | Do |
 |---|---|
 | Reference render, before building | **ALWAYS open it** — Rule 1, non-negotiable. Per-char gradients, layered shadows, blurs, overlaps and true wrap points are invisible in values and this is the only place they are caught |
-| A width scored **PASS** (≥97% + height ≤2% + no hot region) | **Do not open the shots.** The measurement is stricter than your eye: it compared every pixel, checked height, and checked per-region concentration. Re-viewing a PASS adds no information and costs context |
+| A width scored **PASS** (≥99% + height ≤2% + no hot region) | **The anchor view still happens** (row above) — a PASS is not a substitute for it. Beyond the anchor, do not re-open a PASS width unless the anchor view raised a question about it: the differ compared every pixel, checked height, and checked per-region concentration, so a second look at a clean width adds nothing. But a PASS has hidden a whole missing text line before (98.75%, zero hot regions), so the anchor is never traded away for context |
 | A width scored **FAIL** | **Open the built shot and the diff PNG** for the named hot regions. That is what the coordinates are for |
 | A width scored **UNSCORED** (no reference frame) | **Open the built shot** — there is no measurement, so your eye is the only gate. Report it as visually-checked-only |
 | Anchor pass, once per section, at the primary width | **Open the built shot side by side with the reference once**, even on PASS. Holistic wrongness that is spatially identical to the reference (right pixels, wrong feel — balance, hierarchy, an image that is technically placed but visually wrong) is the one class the differ cannot see. **This row paid for itself on kush-header:** it caught an entirely missing text line behind a 98.75% PASS with zero hot regions and a 158/158 property-equality PASS. v1.11.0 had removed this view to save tokens; it cost ~1.5k and saved a shipped defect |
@@ -270,7 +274,7 @@ EFFECTS      N/N manifest rows resolved — built: E1,E2 · interactions-queued:
 BEHAVIOUR    [HTML/URL ref] states scored: base NN.N% · hover ×n NN.N% · scroll NN.N% · click/focus NN.N%
              hover-delta present n/n · timing ✓ (declared vs reference) · triggers ✓ · jank 0 · canvas running ✓
              | reference-not-run: [reason] → built-side measurement only
-VISUAL       pixel-score: NN.N% (≥97) · height delta N.N% (≤2) · hot regions: none|[list] · render-features verified: [gradients/blurs/overlaps]
+VISUAL       pixel-score: NN.N% (≥99) · height delta N.N% (≤2) · hot regions: none|[list] · render-features verified: [gradients/blurs/overlaps]
              human: confirmed/unconfirmed
 A11Y/PERF    contrast n/n · named+reachable n/n · headings ✓ · alt n/n · images NKB · DOM depth N · CLS N.NN   → PASS|FAIL
 PUBLISHES    N (max 2) · unverified states: none | [elements past the auto cap]
@@ -290,7 +294,7 @@ NATIVE / CONTENT / ICONS / EFFECTS / BEHAVIOUR / A11Y-PERF lines are hard gates 
 
 | Case | Verify |
 |---|---|
-| Gradient text | background-clip: text — API can't set (webflow-platform § data_style_tool limitations) → fallback color + ledger |
+| Gradient text | built as a `DOM span` child with `background-image` + `background-clip: text` + `color: transparent` (`build-reference` § Known traps) — verify the span exists, the gradient renders, and no `-webkit-*` was attempted. Solid fallback + ledger ONLY if the style tool actually rejected the unprefixed set |
 | Backdrop blur | backdrop-filter present, radius matches |
 | Per-corner radius | each corner longhand individually |
 | Nested flex | parent AND child flex props independently |

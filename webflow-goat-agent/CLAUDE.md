@@ -1,4 +1,4 @@
-# Webflow GOAT — v2.1.13 (router)
+# Webflow GOAT — v2.1.14 (router)
 
 Pixel-perfect, fully native Webflow builds from any reference (Figma / screenshot / HTML / live URL / description).
 **DONE = visually indistinguishable from the reference at every breakpoint, every effect, every icon, every word — proved by tool output, not by claim.**
@@ -31,7 +31,8 @@ A build lane that writes to Webflow before loading `webflow-core` is a process f
 ## Cost model — the thing that actually costs
 
 Cost = **turns × context size**, not payload size. An image is ~1.5k tokens; a silent reasoning turn at 400k context is 400k.
-Per section: **≤15 tool calls, ≤25 turns, ≤50k peak context.** Passing either → say so in one line and keep going.
+Per section: **≤25 tool calls, ≤35 turns, ≤50k peak context.** Passing either → say so in one line and keep going.
+The call number is derived from the pipeline, not chosen: `webflow-core` § A steps 0-9 are ~22 calls with **zero** fix iterations, and one fix→re-verify cycle is +2. A budget below its own mandated pipeline does not restrain the agent — it teaches it to pick a gate to skip, which is exactly how a 1.4% build passed every gate that ran.
 Never trade a gate for tokens — batch calls instead. Looking at the reference render is cheap and mandatory.
 
 ## Where things are
