@@ -19,6 +19,7 @@ const WALKER=`(function(){
  var SKIP={SCRIPT:1,STYLE:1,NOSCRIPT:1,META:1,LINK:1,TEMPLATE:1,IFRAME:1};
  var DEF={display:'',position:'static','flex-direction':'row','flex-wrap':'nowrap','justify-content':'normal','align-items':'normal',
   'row-gap':'normal','column-gap':'normal','grid-template-columns':'none','max-width':'none','min-width':'0px','min-height':'0px',
+  'flex-grow':'0','flex-shrink':'1','flex-basis':'auto','align-self':'auto','order':'0',
   'font-style':'normal','text-align':'start','text-transform':'none','text-decoration-line':'none','letter-spacing':'normal',
   'background-color':'rgba(0, 0, 0, 0)','background-image':'none','box-shadow':'none',opacity:'1',overflow:'visible',
   'object-fit':'fill','z-index':'auto',transform:'none',filter:'none','backdrop-filter':'none','mix-blend-mode':'normal',cursor:'auto',
@@ -29,6 +30,7 @@ const WALKER=`(function(){
   'padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',
   'font-family','font-size','font-weight','font-style','line-height','letter-spacing','text-align','text-transform','text-decoration-line',
   'color','background-color','background-image','background-size','background-position',
+  'flex-grow','flex-shrink','flex-basis','align-self','order',
   'border-top-width','border-right-width','border-bottom-width','border-left-width',
   'border-top-style','border-right-style','border-bottom-style','border-left-style',
   'border-top-color','border-right-color','border-bottom-color','border-left-color',

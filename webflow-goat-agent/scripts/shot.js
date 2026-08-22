@@ -2,6 +2,14 @@ const CDP=require('child_process');const http=require('http');const fs=require('
 const CHROME=process.platform==="darwin"?"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":process.platform==="win32"?"C:/Program Files/Google/Chrome/Application/chrome.exe":"google-chrome";
 const PROF=path.join(os.tmpdir(),"wf-cdp-prof");
 const url=process.argv[2],out=process.argv[3],W=+process.argv[4],H=+process.argv[5],mobile=process.argv[6]==='1',port=+process.argv[7];
+// Validate BEFORE spawning Chrome. Without this, missing args gave a NaN port, an empty /json/list and the
+// error "Cannot read properties of undefined (reading 'find')" — a stack trace where usage belongs, which
+// reads like a broken tool rather than a wrong command (2026-08-22).
+if(!url||!out||!isFinite(W)||!isFinite(H)||!isFinite(port)){
+  console.error('usage: node shot.js <url> <out.png> <W> <H> <mobile:1|0> <port>');
+  console.error('       full-viewport shot. For one element use shot-el.js <url> <out.png> <W> <selector> <mobile> <port>');
+  process.exit(2);
+}
 const p=CDP.spawn(CHROME,["--headless=new","--disable-gpu","--remote-debugging-port="+port,"--remote-allow-origins=*","--no-first-run","--user-data-dir="+PROF+port,"about:blank"]);
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const get=path=>new Promise((res,rej)=>{http.get({host:'127.0.0.1',port,path},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(JSON.parse(d)))}).on('error',rej)});

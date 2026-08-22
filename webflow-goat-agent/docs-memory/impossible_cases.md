@@ -87,3 +87,27 @@ score the layout (box geometry, wrap points, `text-extents` bands, height delta)
 never report the percentage as a fidelity failure.
 
 **Do NOT** chase this with more publishes. Two verifies reproducing the same score means measure, not fix again.
+
+## 2026-08-22 — a DropdownWrapper and a plain Link do NOT share flex width equally, with identical flex values
+
+**Case:** five siblings in one `display:flex` row — four `DropdownWrapper`, one `LinkBlock`. All five carry
+byte-identical computed `flex-grow: 1` and `flex-basis: 0%`, verified by reading the published page. Free space
+is 1219px, so an even split is 243.8 each. Actual: the four wrappers take **238** and the plain link takes
+**266**. The sum is correct (1218 + 16 gaps = 1234 ≈ 1235), so the space is distributed — just not evenly.
+
+**Ruled out by measurement, not by reasoning:**
+- `.w-dropdown { margin-left/right: auto }` — overridden to `0px`, confirmed applied
+- `.w-dropdown { display: inline-block }` — overridden to `block`, confirmed applied
+- `.w-dropdown-toggle/-link { margin: auto }` — overridden to `0px`
+- differing `flex-grow` / `flex-basis` — identical on all five
+- min-content floors — the link's content ("Financing", 12px) is ~52px, far under 238
+
+**Cost:** two publishes reproducing the same 238, which is the pack's STALLED signal. Stopped there.
+
+**Native alternative:** if a row must be exactly even, make every sibling the SAME element type — either all
+Dropdowns (give the non-menu item a Dropdown with an empty list, or a Dropdown whose toggle is a plain link),
+or all plain links with the menus rebuilt another way. Do not mix a native module and a plain element as flex
+siblings and expect identical sizing.
+
+**Do NOT chase this with more publishes.** Two identical measurements is the stop signal. The residual is
+~2.5% on one element type; everything else in that nav matched the reference exactly.

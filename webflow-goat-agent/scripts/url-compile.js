@@ -37,7 +37,7 @@ const HEADING = /^h([1-6])$/;
 const TAG_AS = { header: 'header', nav: 'nav', footer: 'footer', main: 'main', section: 'section', article: 'article', aside: 'aside' };
 // properties worth authoring on a class. Everything else in a computed dump is noise or a layout result.
 const KEEP = new Set(['display', 'flex-direction', 'flex-wrap', 'align-items', 'justify-content', 'align-self',
-  'flex-grow', 'flex-shrink', 'grid-template-columns', 'grid-template-rows', 'grid-auto-flow',
+  'flex-grow', 'flex-shrink', 'flex-basis', 'align-self', 'order', 'grid-template-columns', 'grid-template-rows', 'grid-auto-flow',
   'column-gap', 'row-gap', 'gap', 'position', 'top', 'right', 'bottom', 'left', 'z-index',
   'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
@@ -98,9 +98,14 @@ const WF_DEFAULTS = {
 // Native MODULE defaults, keyed by the element type the compiler emits. These cost a publish each, because
 // the module's own w-class is invisible both in the reference and in the plan.
 const WF_MODULE_DEFAULTS = {
-  Dropdown:       ['margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
-  DropdownToggle: ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
-  DropdownLink:   ['padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  // Verified against Webflow's served stylesheet 2026-08-22:
+  //   .w-dropdown { margin-left:auto; margin-right:auto; display:inline-block }
+  //   .w-dropdown-btn, .w-dropdown-toggle, .w-dropdown-link { margin-left:auto; margin-right:auto }
+  // `display` matters as much as the margins: an inline-block wrapper sitting in a flex row does not share
+  // width the way its siblings do, which is how four nav pills came out 238px against a plain link's 266px.
+  Dropdown:       ['display', 'margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  DropdownToggle: ['display', 'margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
+  DropdownLink:   ['display', 'margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right'],
   Slider:         ['height', 'background-color'],
   Tabs:           ['margin-top', 'margin-bottom'],
   Navbar:         ['padding-top', 'padding-bottom', 'padding-left', 'padding-right', 'background-color'],
