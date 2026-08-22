@@ -200,7 +200,14 @@ const get = p2 => new Promise((res, rej) => { http.get({ host: '127.0.0.1', port
   const els = contract.elements || [];
   const propSet = [...new Set(els.flatMap(e => Object.keys(e.expect || {}).filter(k => k !== 'box')))];
   const sels = els.map(e => e.sel);
-  const data = JSON.parse(await evalJS(`${READ}(${JSON.stringify(sels)},${JSON.stringify(propSet)},${JSON.stringify(contract.root || null)})`) || '{}');
+  // A page that never loaded returns nothing, which used to parse to {} and surface as EVERY selector
+  // "not present on the page" — indistinguishable from a real build defect, and it happened for real on
+  // 2026-08-22 when a concurrent verify run held the debug port. Ten selectors do not vanish at once; that
+  // is the page failing to load. Say so, and exit as an ERROR rather than a measured FAIL, because a FAIL
+  // means "the build is wrong" and this is "nothing was measured".
+  const raw = await evalJS(`${READ}(${JSON.stringify(sels)},${JSON.stringify(propSet)},${JSON.stringify(contract.root || null)})`);
+  let data;
+  try { data = JSON.parse(raw || '{}'); } catch (e) { data = {}; }
 
   const fails = []; const missing = []; let checked = 0;
   for (const e of els) {
@@ -223,6 +230,17 @@ const get = p2 => new Promise((res, rej) => { http.get({ host: '127.0.0.1', port
       if (!r.ok) fails.push({ sel: e.sel, prop, why: r.why });
     }
   }
+  // EVERY selector missing is not a build with ten absent elements — it is the page not loading, or
+  // the wrong page. Seen for real on 2026-08-22 when a drafted page 404'd and when a concurrent verify
+  // held the debug port: both printed ten MISSING lines that read exactly like a broken build. A FAIL
+  // means "the build is wrong"; this means "nothing was measured", so it exits as an ERROR.
+  if (els.length >= 3 && missing.length === els.length) {
+    bail(2, 'ERR every expected selector was absent — this is a LOAD or WRONG-PAGE failure, not a build defect.' + '\n' +
+      '    url: ' + url + '\n' +
+      '    check, in this order: the page is published and not a draft (a drafted page 404s) · the debug' + '\n' +
+      '    port is free (pass --port=<n>; a concurrent verify run holds the default) · the URL resolves.');
+  }
+
   const verdict = (fails.length === 0 && missing.length === 0) ? 'PASS' : 'FAIL';
   if (JSONOUT) {
     console.log(JSON.stringify({ section: contract.section, width: W, verdict, checked, fails, missing }, null, 1));

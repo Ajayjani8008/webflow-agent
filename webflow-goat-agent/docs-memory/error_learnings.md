@@ -266,3 +266,16 @@ always exists). An explicit zero is design intent here, not noise.
 **Why it was invisible:** the plan looked clean, preflight passed, property equality passed — because the
 property simply was not there to compare. Only the height delta showed it, and only after the font mismatch
 was removed. Two defects stacked; the smaller one is unreachable until the larger is cleared.
+
+## 2026-08-22 — dom-contract reported a LOAD failure as ten build defects
+
+Verifying against a drafted page (404) or while a concurrent verify held the debug port printed ten
+`MISSING — selector not present on the page` lines and exited 1. That reads exactly like a build with every
+element absent, and it happened twice in one session — once sending the diagnosis down the wrong path.
+
+Ten selectors do not vanish at once. **Every expected selector missing means the page did not load, or it is
+the wrong page** — nothing was measured, so it is an ERROR (exit 2), not a measured FAIL (exit 1). It now says
+so and lists the causes in order: page published and not a draft · debug port free (`--port=`) · URL resolves.
+
+The general rule this is an instance of: a gate must distinguish "I measured, and it is wrong" from "I could
+not measure". Reporting the second as the first is how a correct build gets rebuilt.
