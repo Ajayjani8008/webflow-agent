@@ -183,7 +183,7 @@ element patches because the plan was incomplete · **3** style batches where the
 environment workarounds (`npm install` mid-flight, `NODE_PATH=$(…)`, inline `sleep 20`). ~50 of 68 avoidable.
 
 The structural finding is worse than the count: **no pipeline script ran at all** — no `wf-resolve`, no
-`wf-section intake`, no `wf-preflight`, no `record`. The section was built into `covilla-page-design`, a site
+`wf-section intake`, no `wf-preflight`, no `record`. The section was built into `example-site-design`, a site
 with **no state dir**, using `example-site-design`'s ref-cache, and was never recorded — so `build_state` still
 says that footer is `in-progress, cost null` on a site where it does not exist, while 69 real links sit live on
 another site.

@@ -68,3 +68,22 @@ Native alternative used: styled container + REAL native `Dropdown` elements for 
 WRAPS instead of collapsing — every link stays reachable, no content hidden, no invented hamburger.
 To get a true Navbar: convert in the Designer (Designer-only), or wrap this markup in a Navbar and
 re-point the classes.
+
+## 2026-08-22 — a `file://` HTML reference and a published Webflow page can resolve DIFFERENT fonts under the same `font-family`
+
+**Case:** hero built from an HTML delivery. Computed `font-family` was byte-identical on both sides
+(`Inter, Arial, sans-serif`), as were `font-size`, `font-weight` and `letter-spacing` — `dom-contract` flagged none
+of them. Yet the same string measured **635px on the built page vs 595px on the reference: 6.72% wider**, and glyph
+ink was 47px tall vs 45px. The published page resolves a different cut of Inter than the local `file://` render.
+
+**Consequence:** every text line's ink differs, so the global pixel score is capped in the mid-90s no matter how
+correct the layout is. Here the layout was made exact — height delta 0% at 1440/991/767, both wrap points restored —
+and the score still sat at 97.41%. The remaining 2.6% is glyph rasterisation, not a build defect.
+
+**Native alternative / how to avoid:** make the reference and the site resolve the SAME font before scoring —
+add the design's font to the Webflow site (Site settings → Fonts) and have the reference load that same file via
+`@font-face`, rather than naming a family and trusting each renderer to find it. Where that is not possible,
+score the layout (box geometry, wrap points, `text-extents` bands, height delta) and declare the glyph delta,
+never report the percentage as a fidelity failure.
+
+**Do NOT** chase this with more publishes. Two verifies reproducing the same score means measure, not fix again.

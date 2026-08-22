@@ -45,16 +45,44 @@ let PNG;
 try { PNG = require('pngjs').PNG; }
 catch (e) { console.error('ERR pngjs not installed. Run: npm install --prefix "' + path.join(__dirname, '..') + '"'); process.exit(2); }
 
-// Ink = pixels darker than `thresh` luminance and not transparent. Returns null when the band is blank.
-function extents(img, y0, y1, xoff, thresh) {
-  let L = Infinity, R = -1, T = Infinity, B = -1, n = 0;
+// Ink = pixels that differ from the band's OWN background luminance, in whichever direction.
+//
+// This used to be "pixels darker than `thresh`", which silently assumed dark text on a light page.
+// On a dark-theme reference (#0b1020 body, white headline) EVERY background pixel is darker than the
+// threshold, so the band read as 100% ink and every extent came back as the full image width. Worse,
+// `bands` compares reference against built: both sides read full-width, the widths matched, and the
+// gate reported PASS while measuring nothing at all. Found 2026-08-22 by the first dark-theme build.
+//
+// Polarity is now derived per band: the modal luminance bucket is the background, and ink is anything
+// far enough from it. Works on light-on-dark, dark-on-light, and a mid-grey page either way.
+function bandBackgroundLum(img, y0, y1) {
+  const hist = new Uint32Array(32);                 // 8-luminance buckets
   const yEnd = Math.min(y1, img.height - 1);
   for (let y = Math.max(0, y0); y <= yEnd; y++) {
     for (let x = 0; x < img.width; x++) {
       const i = (img.width * y + x) << 2;
       if (img.data[i + 3] < 128) continue;
       const lum = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
-      if (lum >= thresh) continue;
+      hist[Math.min(31, lum >> 3)]++;
+    }
+  }
+  let best = 0;
+  for (let b = 1; b < 32; b++) if (hist[b] > hist[best]) best = b;
+  return best * 8 + 4;
+}
+
+function extents(img, y0, y1, xoff, thresh) {
+  let L = Infinity, R = -1, T = Infinity, B = -1, n = 0;
+  const yEnd = Math.min(y1, img.height - 1);
+  const bg = bandBackgroundLum(img, y0, y1);
+  // `thresh` stays the sensitivity knob; it is now a DISTANCE from the background, not an absolute cut.
+  const minDelta = Math.max(24, Math.min(thresh, 255 - thresh) * 0.5);
+  for (let y = Math.max(0, y0); y <= yEnd; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const i = (img.width * y + x) << 2;
+      if (img.data[i + 3] < 128) continue;
+      const lum = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
+      if (Math.abs(lum - bg) < minDelta) continue;
       n++;
       if (x < L) L = x; if (x > R) R = x;
       if (y < T) T = y; if (y > B) B = y;
@@ -94,6 +122,18 @@ if (flag('self-test')) {
   ];
   // solve is pure arithmetic: 102px measured at ls 4.4 over 11 gaps, target 111 -> 5.22px
   const solved = 4.4 + (111 - 102) / 11;
+  // DARK THEME — the polarity regression. Before 2026-08-22 ink was "darker than thresh", so on a dark
+  // page every background pixel counted as ink: extents spanned the whole image and `bands` compared
+  // full-width against full-width and reported PASS while measuring nothing. Same geometry as the light
+  // fixture above, inverted: a #0b1020 field with a white bar at x=12..21, rows 5..9.
+  const dark = new PNG({ width: 40, height: 20 });
+  for (let i = 0; i < dark.data.length; i += 4) { dark.data[i] = 11; dark.data[i + 1] = 16; dark.data[i + 2] = 32; dark.data[i + 3] = 255; }
+  for (let y = 5; y <= 9; y++) for (let x = 12; x <= 21; x++) { const i = (40 * y + x) << 2; dark.data[i] = dark.data[i + 1] = dark.data[i + 2] = 255; }
+  const d = extents(dark, 0, 19, 0, 110);
+  const dBlank = extents(dark, 15, 19, 0, 110);
+  cases.push(['dark theme: light-on-dark ink is measured, not the whole field', d && d.width === 10 && d.left === 12 && d.right === 21]);
+  cases.push(['dark theme: ink pixel count exact', d && d.inkPx === 50]);
+  cases.push(['dark theme: an empty band is still blank (not "all ink")', dBlank === null]);
   cases.push(['solve is linear and exact', Math.abs(solved - 5.2181818) < 0.001]);
   // check-spec, on the real example-header numbers
   const implied = (measured, track, glyphs, fs2) => ((measured - track) / glyphs) / fs2;

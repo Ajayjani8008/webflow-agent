@@ -235,7 +235,7 @@ playwright probe, `npm install`) · **7** ad-hoc `node -e` one-liners against a 
 reads in ONE call · **12** scratchpad write/patch cycles · **9** post-build element patches because the plan was
 incomplete · **3** style batches where the rule says one · **2+** environment workarounds. ~50 of 68 avoidable.
 
-And the state layer was bypassed entirely: the footer was built into `covilla-page-design`, a site with **no
+And the state layer was bypassed entirely: the footer was built into `example-site-design`, a site with **no
 state dir**, using another site's `ref-cache`, and never recorded — so `build_state` claims that footer is
 `in-progress, cost null` on a site where it does not exist, while 69 real links sit live somewhere else.
 
