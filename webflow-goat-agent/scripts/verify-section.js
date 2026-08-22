@@ -89,12 +89,17 @@ function decideVerdict(failCount, measured, anchorOk) {
 function refFramesInvalid(scores) {
   const scored = (scores || []).filter(s => s.ref && s.refHeight);
   if (scored.length < 2) return null;
-  const byH = new Map();
-  for (const s of scored) byH.set(s.refHeight, (byH.get(s.refHeight) || 0) + 1);
-  const [h, n] = [...byH.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (n < 2) return null;
-  const widths = scored.filter(s => s.refHeight === h).map(s => s.width).sort((a, b) => a - b);
-  return `REFERENCE INVALID — ${n} reference frames (${widths.join(', ')}) are all ${h}px tall. ` +
+  // Compare the EXTREMES only. Two neighbouring widths sharing a height is ordinary — nothing rewrapped
+  // between them — and flagging that is a false positive (seen 2026-08-22: a short section measured 812px
+  // at both 1440 and 991, which is simply correct). What is impossible is the WIDEST and NARROWEST frame
+  // rendering at the same height: that means the capture never reflowed at all.
+  const sorted = [...scored].sort((a, b) => a.width - b.width);
+  const lo = sorted[0], hi = sorted[sorted.length - 1];
+  if (lo.width === hi.width || lo.refHeight !== hi.refHeight) return null;
+  const h = lo.refHeight;
+  const widths = [lo.width, hi.width];
+  const n = scored.filter(s => s.refHeight === h).length;
+  return `REFERENCE INVALID — the widest and narrowest reference frames (${widths.join(' and ')}) are both ${h}px tall. ` +
     'A page that reflows cannot render the same height at different widths, so these are one layout cropped, ' +
     'not per-breakpoint frames. Every score against them is meaningless. Most common cause: an HTML reference ' +
     'with no <meta name="viewport" content="width=device-width, initial-scale=1"> — mobile emulation then falls ' +
@@ -138,6 +143,12 @@ function selfTest() {
     ['a genuinely reflowing reference is accepted',
       refFramesInvalid([{ width: 1440, ref: 'a.png', refHeight: 1048 },
         { width: 767, ref: 'b.png', refHeight: 1176 }, { width: 390, ref: 'c.png', refHeight: 1552 }]) === null, true],
+    ['neighbouring widths may share a height — that is not a defect', (() => {
+      // a short section can measure identically at 1440 and 991 because nothing rewrapped between them;
+      // an earlier cut of this check flagged exactly that and called a valid reference invalid
+      return refFramesInvalid([{ width: 1440, ref: 'a.png', refHeight: 812 },
+        { width: 991, ref: 'b.png', refHeight: 812 }, { width: 390, ref: 'c.png', refHeight: 1324 }]) === null;
+    })(), true],
     ['one width alone is never flagged',
       refFramesInvalid([{ width: 1440, ref: 'a.png', refHeight: 1048 }]) === null, true],
   ];

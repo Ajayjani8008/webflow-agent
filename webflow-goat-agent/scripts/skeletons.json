@@ -247,6 +247,21 @@
    "createdType": null,
    "available": false,
    "notes": "NOT in the element_schema type enum at all (Tabs/Slider/Dropdown/Lightbox/Form are). get_more_tools ELEMENTS returned 'we have shown you the full tool list'. An API-built header therefore cannot be a real Navbar and has no hamburger. See impossible_cases.md."
+  },
+  "List": {
+   "createdType": "List",
+   "createdVia": "data_element_builder type BY_CUSTOM_TAG with custom_tag 'ul' (there is no 'List' element type)",
+   "children": [
+    "ListItem",
+    "ListItem",
+    "ListItem"
+   ],
+   "defaults": {
+    "items": 3
+   },
+   "placeholders": [],
+   "iconFontChildren": [],
+   "notes": "A ul built with BY_CUSTOM_TAG is created as a native List and arrives WITH THREE EMPTY ListItem children. Appending your own items leaves six rows: three empty bullets above three real ones. Remove the three defaults, or reuse them instead of appending. ALSO: a ListItem does not accept text at all \u2014 inline set_text is silently dropped at creation and data_element_tool > set_text returns 'This element doesn't support text'. Give each ListItem a DOM span child and set the text on that. Verified 2026-08-22."
   }
  },
  "setTextSafeTypes": [
@@ -261,7 +276,9 @@
   "TextBlock",
   "Block",
   "DropdownToggle-inner-Block",
-  "TabsLink-inner-Block"
+  "TabsLink-inner-Block",
+  "ListItem",
+  "BY_CUSTOM_TAG"
  ],
  "iconFontTypes": [
   "Icon"

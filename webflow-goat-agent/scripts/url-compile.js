@@ -44,8 +44,14 @@ const KEEP = new Set(['display', 'flex-direction', 'flex-wrap', 'align-items', '
   'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'text-transform',
   'text-align', 'text-decoration', 'color', 'background-color', 'background-image', 'opacity',
   'border-radius', 'border-top-left-radius', 'border-top-right-radius', 'border-bottom-left-radius',
-  'border-bottom-right-radius', 'border-top-width', 'border-top-style', 'border-top-color',
-  'border-bottom-width', 'border-bottom-style', 'border-bottom-color', 'box-shadow', 'transition',
+  'border-bottom-right-radius',
+  // ALL FOUR sides, all three facets. KEEP used to carry top+bottom width but only top style/colour, so a
+  // 1px box border compiled as a two-sided border with one styled edge — a visible defect on every card,
+  // input and divider, and invisible in the plan unless you read it property by property.
+  'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+  'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+  'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+  'box-shadow', 'transition',
   'overflow', 'max-width', 'width', 'height', 'min-height', 'flex-basis', 'text-overflow', 'white-space']);
 const SHORTHAND = {
   'gap': ['grid-row-gap', 'grid-column-gap'],
@@ -227,10 +233,38 @@ function compile() {
         const intrinsic = INTRINSIC_TAGS.has(n.tag) || (iconSized && /icon|logo|avatar|badge|mark|chevron|arrow/i.test(String(n.class || '')));
         if (frac && !intrinsic) continue;
       }
+      // A computed `grid-template-columns` resolves fr units to pixels: `1fr 1fr` reads back as
+      // `496px 496px`. Authoring that pins the grid to the capture viewport and it will overflow every
+      // narrower one. Re-express pixel tracks as the fr ratio they came from.
+      if (k === 'grid-template-columns' || k === 'grid-template-rows') {
+        const parts = String(v).trim().split(/\s+/);
+        if (parts.length > 1 && parts.every(t => /^\d+(\.\d+)?px$/.test(t))) {
+          const nums = parts.map(parseFloat);
+          const min = Math.min(...nums);
+          const fr = nums.map(x => { const r = x / min; return (Math.abs(r - Math.round(r)) < 0.02 ? Math.round(r) : +r.toFixed(2)) + 'fr'; });
+          out[k] = fr.every(f => f === '1fr') ? `repeat(${fr.length}, 1fr)` : fr.join(' ');
+          continue;
+        }
+      }
       if (k === 'transition') { Object.assign(out, expandTransition(v)); continue }
       if (SHORTHAND[k]) { for (const long of SHORTHAND[k]) out[long] = v; continue }
       out[k] = v;
     }
+    // A border WIDTH on a side with no border-style renders nothing: CSS defaults style to `none`. Older
+    // captures only recorded the top side's style/colour, so a 1px box border compiled into a single top
+    // edge. Mirror whichever side we have onto the sides that carry a width but no style.
+    {
+      const sides = ['top', 'right', 'bottom', 'left'];
+      const anyStyle = sides.map(s => out[`border-${s}-style`]).find(Boolean);
+      const anyColor = sides.map(s => out[`border-${s}-color`]).find(Boolean);
+      for (const s of sides) {
+        const w = parseFloat(out[`border-${s}-width`]);
+        if (!w) continue;
+        if (!out[`border-${s}-style`] && anyStyle) out[`border-${s}-style`] = anyStyle;
+        if (!out[`border-${s}-color`] && anyColor) out[`border-${s}-color`] = anyColor;
+      }
+    }
+
     // ── SNAPSHOT ARTIFACTS (v2.1.15) ───────────────────────────────────────────────────────────────
     // A capture is a photograph of ONE viewport, not a design. Several computed values are measurements of
     // that moment, and authoring them as CSS breaks every other width. Measured 2026-08-22 on a real build:
@@ -267,9 +301,9 @@ function compile() {
         const p = nodes[j];
         if (typeof p.depth === 'number' && p.depth < n.depth) {
           const pb = (p.box && p.box.w) || VW;
-          const pad = ['padding-left', 'padding-right']
+          const inset = ['padding-left', 'padding-right', 'border-left-width', 'border-right-width']
             .reduce((s, k) => s + (parseFloat((p.styles || {})[k]) || 0), 0);
-          return Math.max(0, pb - pad);
+          return Math.max(0, pb - inset);
         }
       }
       return VW;
@@ -283,6 +317,31 @@ function compile() {
       delete out.width;                       // full-bleed inside its parent: say nothing, let it be a block
       if (out['max-width'] && Math.abs(parseFloat(out['max-width']) - ownW) < 1) delete out['max-width'];
     }
+    // 4b. A direct child of a grid or flex container is sized BY THE CONTAINER. Its measured width is the
+    //     track it landed in, not a constraint anyone authored — `1fr 1fr` gave a card `max-width: 496px`,
+    //     which then fights the grid at every other viewport. Let the container do its job.
+    if (!isIntrinsic && Array.isArray(nodes) && typeof n.depth === 'number') {
+      const i2 = nodes.indexOf(n);
+      for (let j = i2 - 1; j >= 0; j--) {
+        const p2 = nodes[j];
+        if (typeof p2.depth === 'number' && p2.depth < n.depth) {
+          // Only a FR-BASED grid track is definitely not design intent: `1fr 1fr` sizes the child, so its
+          // measured width is the track. A grid with no fr tracks (or a flex row) may well contain a child
+          // whose width the author really did set, and an earlier cut of this deleted exactly that —
+          // caught by this file's own container-fluidity test. Narrow signal, not a broad one.
+          const ps = p2.styles || {};
+          // The PARENT is read from the raw capture, where a fr grid has already been resolved to pixel
+          // tracks — so test the signature (a multi-track template), not the literal `fr`. A grid with no
+          // template at all still sizes children by content, so it stays exempt: that is the fixture case
+          // this file's container-fluidity test guards.
+          const tracks = String(ps['grid-template-columns'] || '').trim();
+          const multiTrack = tracks && tracks.split(/\s+/).length > 1;
+          if (/grid/.test(String(ps.display || '')) && multiTrack) { delete out.width; delete out['max-width']; }
+          break;
+        }
+      }
+    }
+
     // 5. A max-width equal to the capture viewport is the viewport, not a constraint.
     if (out['max-width'] && VW && Math.abs(parseFloat(out['max-width']) - VW) < 1) delete out['max-width'];
 
@@ -416,6 +475,13 @@ function selfTest() {
       { tag: 'img', depth: 2, path: 'header>div[3]>img', class: 'site-nav__blade-img', box: { x: 700, y: 10, w: 24, h: 24 }, styles: { width: '24px', height: '24px' } },
       // a CONTAINER with a bare px width: the reference viewport is not responsive intent (Rule 7)
       { tag: 'div', depth: 2, path: 'header>div[3]>div[2]', class: 'site-nav__inner', box: { x: 410, y: 10, w: 1200, h: 60 }, styles: { display: 'flex', width: '1200px' } },
+      // a fr grid resolved to pixel tracks, and a bordered child sized BY that grid
+      { tag: 'div', depth: 1, path: 'header>div[4]', class: 'site-nav__grid', box: { x: 0, y: 100, w: 1120, h: 200 },
+        styles: { display: 'grid', 'grid-template-columns': '496px 496px', 'column-gap': '64px' } },
+      { tag: 'div', depth: 2, path: 'header>div[4]>div', class: 'site-nav__card', box: { x: 0, y: 100, w: 496, h: 200 },
+        styles: { display: 'block', width: '496px', 'background-color': 'rgb(255,255,255)',
+          'border-top-width': '1px', 'border-right-width': '1px', 'border-bottom-width': '1px', 'border-left-width': '1px',
+          'border-top-style': 'solid', 'border-top-color': 'rgb(227,231,242)' } },
     ],
   }));
   const run = a => { const r = require('child_process').spawnSync(process.execPath, [__filename, ...a], { encoding: 'utf8' }); return { code: r.status, out: (r.stdout || '') + (r.stderr || '') } };
@@ -453,6 +519,29 @@ function selfTest() {
       plan.classes.some(c => c.properties && c.properties.width === '100%' && c.properties['max-width'] === '1200px'), true],
     ['line-height:normal not authored',
       JSON.stringify(plan.classes).includes('"line-height":"normal"'), false],
+    // ── border + grid fidelity (v2.1.15). Each of these shipped a visible defect on the first real card.
+    // ── border + grid fidelity (v2.1.15). Each shipped a visible defect on the first real card.
+    // Matched by PROPERTY, not by class name: the fixture's naming is not what is under test here.
+    ['a 1px box border keeps ALL FOUR widths', (() => {
+      const c = plan.classes.find(x => x.properties && x.properties['border-top-width']);
+      return !!c && ['top', 'right', 'bottom', 'left'].every(s => c.properties[`border-${s}-width`] === '1px');
+    })(), true],
+    ['every bordered side gets a style (a width with no style renders NOTHING)', (() => {
+      const c = plan.classes.find(x => x.properties && x.properties['border-top-width']);
+      return !!c && ['top', 'right', 'bottom', 'left'].every(s => c.properties[`border-${s}-style`] === 'solid');
+    })(), true],
+    ['every bordered side gets a colour', (() => {
+      const c = plan.classes.find(x => x.properties && x.properties['border-top-width']);
+      return !!c && ['top', 'right', 'bottom', 'left'].every(s => !!c.properties[`border-${s}-color`]);
+    })(), true],
+    ['resolved pixel grid tracks become fr again', (() => {
+      const g = plan.classes.find(x => x.properties && x.properties['grid-template-columns']);
+      return !!g && /fr/.test(String(g.properties['grid-template-columns']));
+    })(), true],
+    ['a child of a multi-track grid does NOT carry the track as its width', (() => {
+      const c = plan.classes.find(x => x.properties && x.properties['border-top-width']);
+      return !!c && !c.properties.width && !c.properties['max-width'];
+    })(), true],
     ['image flagged as needing an asset', flat.includes('needsAsset'), true],
     ['container px width becomes fluid 100% + max-width', flat.includes('"width":"100%"') && flat.includes('"max-width"'), true],
     ['transition shorthand expanded (preflight blocks it otherwise)', flat.includes('transition-timing-function'), true],

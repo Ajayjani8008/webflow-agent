@@ -212,7 +212,7 @@ if (exists(REPO)) {
 // ---------- 5b. NO CLIENT IDENTITY IN THE DISTRIBUTED PACK (v2.1.15) ----------
 // The pack is built for ANY site, so it must not ship the name of one. Enforced here because doing it by
 // hand failed three times in a single day (2026-08-22): each sweep searched a list of names written from
-// memory rather than the real set, so `covilla-page-design` survived two passes and a staging subdomain
+// memory rather than the real set, so one client site survived two passes and a staging subdomain
 // survived three. The real set is on disk — every site the agent has ever resolved has a state dir — so
 // the check reads THAT and greps the pack for it. A name nobody remembered is still caught.
 {

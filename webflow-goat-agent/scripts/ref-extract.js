@@ -29,7 +29,9 @@ const WALKER=`(function(){
   'padding-top','padding-right','padding-bottom','padding-left','margin-top','margin-right','margin-bottom','margin-left',
   'font-family','font-size','font-weight','font-style','line-height','letter-spacing','text-align','text-transform','text-decoration-line',
   'color','background-color','background-image','background-size','background-position',
-  'border-top-width','border-right-width','border-bottom-width','border-left-width','border-top-style','border-top-color',
+  'border-top-width','border-right-width','border-bottom-width','border-left-width',
+  'border-top-style','border-right-style','border-bottom-style','border-left-style',
+  'border-top-color','border-right-color','border-bottom-color','border-left-color',
   'border-top-left-radius','border-top-right-radius','border-bottom-right-radius','border-bottom-left-radius',
   'box-shadow','opacity','overflow','object-fit','z-index','transform','filter','backdrop-filter','mix-blend-mode','cursor','transition'];
  var ZERO={'row-gap':1,'column-gap':1,'padding-top':1,'padding-right':1,'padding-bottom':1,'padding-left':1,
@@ -50,7 +52,8 @@ const WALKER=`(function(){
    if(ZERO[k]&&v==='0px')continue;
    if(k==='transition'&&TRANS_DEF[v])continue;
    st[k]=v;}
-  if(!st['border-top-width']&&!st['border-right-width']&&!st['border-bottom-width']&&!st['border-left-width']){delete st['border-top-style'];delete st['border-top-color'];}
+  if(!st['border-top-width']&&!st['border-right-width']&&!st['border-bottom-width']&&!st['border-left-width']){
+    ['top','right','bottom','left'].forEach(function(s){delete st['border-'+s+'-style'];delete st['border-'+s+'-color'];});}
   var o={tag:el.tagName.toLowerCase(),depth:depth,path:pathStr};
   if(el.id)o.id=el.id;
   if(el.className&&typeof el.className==='string'&&el.className.trim())o.class=el.className.trim();

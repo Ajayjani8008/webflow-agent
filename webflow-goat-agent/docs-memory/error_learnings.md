@@ -230,3 +230,20 @@ so deleting it for real is a one-click manual step the user has to take.
 **Consequence for builds:** a page created via `create_page` cannot be un-created by the agent. Create pages only
 when the user asked for that page to exist — never as a scratch target for a build or a test, because the cleanup
 is not fully in the agent's hands.
+
+## 2026-08-22 — a `ul` built with BY_CUSTOM_TAG is a native List, and its items cannot take text
+
+Two traps in one element, both caught by the step-5 placeholder sweep BEFORE a publish was spent.
+
+1. **`BY_CUSTOM_TAG` + `custom_tag: "ul"` creates a native `List` pre-populated with THREE empty `ListItem`
+   children.** Appending your own three items leaves six rows — three empty bullets sitting above three real
+   ones. It is the same auto-skeleton behaviour `skeletons.json` already documented for Slider/Tabs/Form, but
+   List was not in that table. It is now. Remove the defaults, or reuse them instead of appending.
+2. **A `ListItem` does not accept text.** Inline `set_text` at creation is silently dropped (the strings simply
+   never appear), and `data_element_tool > set_text` afterwards returns *"This element doesn't support text"*.
+   The native fix is a `DOM` `span` child per item carrying the text — the same margin-free text leaf used for
+   labels and badges.
+
+**Why this cost nothing:** the pre-publish sweep queries every planned string on the page before publishing. It
+found 3 of 7 strings missing while the page was still unpublished. Publishing first would have burned a publish
+and produced a section that passed every structural gate with a third of its content absent.
