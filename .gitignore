@@ -1,2 +1,4 @@
 .DS_Store
 scripts/.cache/
+webflow-goat-agent/scripts/node_modules/
+node_modules/
