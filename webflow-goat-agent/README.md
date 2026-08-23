@@ -131,18 +131,23 @@ Two kinds of Webflow tool exist, and only one needs this:
 - **Data tools** — REST API. Create elements, set styles, read pages. Work headless, no browser needed.
 - **Designer tools** — talk to your **open Designer canvas**: which page you are on, what is selected, breakpoints, component view. These reach the canvas through a **bridge app that runs inside the Designer**.
 
-Install it once per site:
+Do this once per site:
 
 1. Open the site in the **Webflow Designer**.
 2. Open the **Apps** panel in the left toolbar.
-3. Find the Webflow **MCP / Claude bridge** app (in the Apps panel, or install it from Webflow's app marketplace — search for the MCP app). Names shift as Webflow rolls features out; it is the app whose job is connecting an AI assistant to the Designer.
-4. **Install** it to this site, then **open / launch** it.
-5. **Leave that Designer tab open on the target page while the agent works.**
+3. Type **`MCP`** in the app search box. You will see two groups:
+   - **Connected** — apps already installed on this site
+   - **App Marketplace** — apps you can add. It lists one connector per assistant: **Claude MCP Connector**, ChatGPT MCP Connector, Cursor MCP Connector.
+4. Click **Claude MCP Connector** → install / connect it to this site, and approve the access it asks for.
+5. Search `MCP` again. **`Webflow MCP Bridge App` must now appear under Connected.** That is the bridge the Designer tools actually talk through — if it is not there, the Designer half of the agent cannot work no matter what the connector in Claude says.
+6. **Open / launch** the bridge app, and **leave that Designer tab open on the target page while the agent works.**
+
+Do it on every site you want to build in. Apps are installed per site, not per account.
 
 **Symptoms when it is not running:** the agent reports `designer_tool` failing or "bridge disconnected". Almost always one of:
-- the app is not installed/launched on this site
+- `Webflow MCP Bridge App` is not under **Connected** on this site (step 5 was never completed)
 - the Designer tab was **backgrounded and went idle** — this is the common one
-- you are on a different page or a branch
+- you are on a different page, or on a branch
 
 **Important:** a bridge drop is usually **not** a failed build. Element and style writes go through the data API and land anyway — they appear the moment you focus the tab. **Do not ask for a rebuild.** That is how a section gets built twice.
 
@@ -155,7 +160,7 @@ Neither? The agent will ask you for screenshots instead — which is why Tessera
 ### ✅ Part B is done when
 
 - `list my Webflow sites` in Claude Code shows your target site
-- the Designer is open on the target page with the bridge app running
+- the Designer is open on the target page, with `Webflow MCP Bridge App` listed under **Connected** in the Apps panel and launched
 - you know which of the two paths in B.3 you are on
 
 ---
@@ -325,7 +330,7 @@ Pack files are **LF** line endings, enforced by `.gitattributes`, because `wf-li
 | Problem | Cause | Fix |
 |---|---|---|
 | Claude asks permission every few seconds | permissions not merged, or the rule is not the literal absolute path | C.4 |
-| "designer_tool failed" / "bridge disconnected" | bridge app not launched, or the Designer tab went idle in the background | focus the tab. **Do not rebuild** — the writes already landed |
+| "designer_tool failed" / "bridge disconnected" | `Webflow MCP Bridge App` not connected/launched on this site, or the Designer tab went idle in the background | check the Apps panel (B.5), then focus the tab. **Do not rebuild** — the writes already landed |
 | Agent cannot see my site | site not approved during authorize, or wrong account | B.4, then `list my Webflow sites` |
 | It built into the wrong page | the agent builds where **you** are looking | open the right page, say "rebuild here" |
 | Everything works but nothing appears | you are on a different page or a branch in the Designer | check the page and branch |

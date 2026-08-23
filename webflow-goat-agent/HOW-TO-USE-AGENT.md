@@ -364,7 +364,7 @@ Always **absolute path, one command, nothing before it** — otherwise you pay a
 | Symptom | What is really happening | Fix |
 |---|---|---|
 | Claude asks permission every few seconds | permission rules not merged, or the rule is not the literal absolute path | [`README.md` C.4](README.md#c4--merge-the-permissions--do-not-skip) |
-| "designer_tool failed" / "bridge disconnected" | bridge app not launched on this site, or the Designer tab went idle in the background | focus the tab. **Do not ask for a rebuild** — the element and style writes already landed and appear when the tab wakes |
+| "designer_tool failed" / "bridge disconnected" | `Webflow MCP Bridge App` is not connected/launched on this site, or the Designer tab went idle in the background | Designer → Apps → search `MCP`: the bridge app must be under **Connected** (install `Claude MCP Connector` if it is not). Then focus the tab. **Do not ask for a rebuild** — the element and style writes already landed and appear when the tab wakes |
 | The agent cannot see my site | the site was not approved during authorize, or the wrong Webflow account is connected | re-authorize in claude.ai → Connectors, then say `list my Webflow sites` |
 | Tools authorize fine but nothing reaches the canvas | the connected Webflow account is not the account logged into the Designer | one account on both sides — [`README.md` B.3](README.md#b3---the-account-rule--read-this-before-anything-else) |
 | The wrong page got built | the agent builds where **you** are looking, and you were on another page or branch | open the right page, say "rebuild here" |
@@ -412,7 +412,7 @@ Always **absolute path, one command, nothing before it** — otherwise you pay a
 |---|---|
 | **native** | built from real Webflow elements and classes, not pasted code |
 | **MCP / connector** | the link that lets Claude talk to Webflow |
-| **bridge app** | the small Webflow app running inside your Designer that lets Claude see your canvas |
+| **bridge app** | `Webflow MCP Bridge App` — the Webflow app running inside your Designer that lets Claude see your canvas. Installed per site via `Claude MCP Connector` in the Apps panel |
 | **data tools vs Designer tools** | data tools write through Webflow's API without a browser; Designer tools need your open Designer tab |
 | **intake** | reading and writing down what your design actually says, before building |
 | **spec** | that written result — the contract the build is judged against |
