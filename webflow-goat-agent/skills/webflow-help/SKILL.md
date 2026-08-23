@@ -5,7 +5,7 @@ description: User cheat sheet for the Webflow GOAT agent — commands, rules, qu
 
 # Webflow GOAT — Help
 
-Show the user this cheat sheet (formatted, short). Do NOT start any build action from this skill. If a full manual exists at `$WF/how-to-use.md` (`WF="$HOME/docs/memory/webflow"`) or the pack's `how-to-use.md`, mention it.
+Show the user this cheat sheet (formatted, short). Do NOT start any build action from this skill. Point the user at the two written docs when they exist (`WF="$HOME/docs/memory/webflow"`): `$WF/README.md` for setup (prerequisites, the Webflow account rule, connector authorize, the Designer bridge app, permissions) and `$WF/HOW-TO-USE-AGENT.md` for daily use (prompt library, copying a section to another site, troubleshooting).
 
 ## Start a build — just say it
 
