@@ -1,5 +1,76 @@
 # Webflow GOAT — CHANGELOG
 
+## v2.1.18 — intake decides, the checker only confirms (2026-08-23)
+
+**The defect.** The pack's shape was build -> verify -> discover a rule the reference always contained ->
+fix -> publish -> verify again. Guess-and-correct. Measured on one page: three sections, 8 publishes, and
+the two most expensive corrections were both facts sitting in the reference at intake — a breakpoint rule
+that hides two of three gallery cards below 767, and type sizes that had to be measured per width instead
+of read off a clamp curve. Neither was a judgement call. Worse, `url-compile.js` already existed and was
+not used: the plans were hand-authored from a reading of the stylesheet, at one width.
+
+**New: `scripts/wf-plan.js`.** One command, source -> complete plan, before any Webflow write. Captures
+1440/991/767/478, compiles each, and diffs them into base + real breakpoint overrides automatically,
+including every element the reference HIDES at a width. Returns readiness: fonts the site must already
+carry, image slots the owner must fill. Exit 1 = not buildable yet. On a live reference it surfaced 6
+hidden elements and 2 missing fonts in one run, with zero writes and zero publishes.
+
+**New: `scripts/wf-cms.js`.** CMS held to the same standard.
+- `plan` derives the collection FROM the reference: item count, which slots vary per item (typed
+  PlainText / RichText / Number / DateTime / Image / Link), which slots are identical in every item and
+  are therefore static chrome and must never become fields, the per-element binding map with its exact
+  setting key, the item payloads, and the image-upload count. Two guards, both from real failures found
+  while building it: candidates are ranked by CONTENT not by repeat count (a 144-cell decorative pixel
+  mask out-repeated a 5-row content list and produced a zero-field plan that still read READY), and a
+  group with no varying slot returns NO-CMS with its reason instead of creating an empty collection.
+- `build` emits the exact ordered MCP call sheet with real values filled in, so the call order is never
+  invented at the keyboard. Items are published BEFORE the element tree is built, which is asserted.
+- `verify` reads Webflow's own runtime classes, which nothing in the pack was reading: `.w-dyn-empty`
+  (no items reached the list), `.w-dyn-bind-empty` (bound and got nothing back — this is what "my CMS
+  data is not showing" actually looks like in the DOM), item-count mismatch, bound images with no src,
+  and `.w-condition-invisible`. Each symptom maps to its causes and its fix. A pixel score cannot see any
+  of them: an empty bound heading is blank pixels, so a section can score 99% with every item missing.
+
+**Rules.** `webflow-core` gains pipeline step 2b (plan the whole section from the source, every
+breakpoint, before the first write; hand-authoring a plan from a reading of the source is a process
+failure) and the standing principle: the checker confirms, it does not discover — if a gate can find it,
+intake was supposed to know it, and a verify run that CHANGES the build is an intake bug. `cms-build`
+gains section 0 (derive the collection from the reference) and section 4b (prove the data renders).
+
+Self-tests: 16/16 green, wf-lint clean, all site-agnostic — no site id, client name or project value in
+any of it.
+
+## v2.1.16 — Invariant 5 is now machine-checked (2026-08-23)
+
+**The defect.** `data_style_tool` accepts any CSS, but anything Webflow's Designer has no *field* for is stored as a
+**Custom Property**. It still emits CSS — so the pixel score, `dom-contract` property equality, a11y and the anchor
+view all pass — while the build is not Webflow-native and the client cannot edit it in the Designer. Caught by the
+user from a screenshot of the Custom Properties panel showing `font-family: Inter, Arial, sans-serif` and
+`font-size: clamp(3rem, 9.6vw, 120px)` on a shipped section. The pack knew this rule for *shorthands* only; nothing
+checked value functions, font stacks, or properties with no control at all.
+
+**The fix (site-agnostic, no project data anywhere in it):**
+- `scripts/native-props.json` — the machine-readable table of what the native panel can express: blocked value
+  functions (`clamp`/`min`/`max`/`env`), `font-family` single-installed-family rule, properties with no control
+  (`aspect-ratio`, `inset`, `place-items`, `place-content`, `text-align-last`, `hyphens`, `text-wrap`), the native
+  unit list, and an explicit `notChecked` section so the rule stays honest about what has actually been verified.
+- `scripts/native-props.js` — checker + 11-case self-test; `checkClass` / `checkPlan`.
+- `wf-preflight.js` — new blockers `custom-property-leak` and `font-not-on-site`, plus `--fonts=` (comma list or
+  json file) so the font check is exact per site while the pack itself stays site-agnostic. A font the site does
+  not have is now a BLOCKER, never a silent fallback stack: a substituted face changes every glyph advance, so the
+  section can never reach the pixel floor and no score can attribute the gap.
+- `url-compile.js` — emits native-only: `font-family` reduced to one family, `fontsRequired` reported, any
+  clamp/min/max/env value dropped with a report line telling the agent to author base + measured breakpoint
+  overrides instead.
+- `skills/webflow-core` — Invariant 5 rewritten with all three failure modes; pipeline step 4 now passes `--fonts`;
+  Never-list gains "shipping a value the Designer cannot hold" and "substituting a font the site does not have".
+
+**Why breakpoint overrides beat clamp anyway:** a clamp curve is the source's formula; a measured value at each
+width is what the reference actually renders there. Converting a live build from clamp to measured px raised its
+scores (topbar 98.51 -> 98.77 @1440, 99.19 -> 99.32 @767, 98.69 -> 98.91 @478). Native is not a tradeoff against
+fidelity — it was more accurate.
+
+
 Version history only. Never loaded at runtime (v2.0 moved it out of the always-injected rules dir — it was 2.1k tokens of changelog in every session).
 
 ## v2.1.15 — 2026-08-22

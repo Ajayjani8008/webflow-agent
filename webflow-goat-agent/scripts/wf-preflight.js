@@ -33,8 +33,20 @@ const fs = require('fs'); const path = require('path');
 const argv = process.argv.slice(2);
 const JSONOUT = argv.includes('--json');
 const SELFTEST = argv.includes('--self-test');
+// Installed site fonts, supplied by the caller — never hardcoded here (the pack stays site-agnostic).
+// --fonts=a,b,c   or   --fonts=<path to a json array / {"fonts":[...]}>
+let INSTALLED_FONTS = null;
 const argvOpt = n => { const p = '--' + n + '='; const a = argv.find(x => x.startsWith(p)); return a ? a.slice(p.length) : null; };
+(() => {
+  const raw = (() => { const pfx = '--fonts='; const a = argv.find(x => x.startsWith(pfx)); return a ? a.slice(pfx.length) : null })();
+  if (!raw) return;
+  try {
+    if (fs.existsSync(raw)) { const j = JSON.parse(fs.readFileSync(raw, 'utf8')); INSTALLED_FONTS = Array.isArray(j) ? j : (j.fonts || null) }
+    else INSTALLED_FONTS = raw.split(',').map(x => x.trim()).filter(Boolean);
+  } catch (e) { INSTALLED_FONTS = null }
+})();
 const SK = JSON.parse(fs.readFileSync(path.join(__dirname, 'skeletons.json'), 'utf8'));
+const NATIVE = require('./native-props');   // Invariant 5, machine-checkable
 
 // CSS shorthands that must be expanded to longhand, and what they expand to.
 const SHORTHANDS = {
@@ -252,6 +264,12 @@ function check(plan, o) {
       W('partial-radius', `class ${c.name}`, `only ${have.length}/4 radius corners set`,
         'set all four longhands unless the design really has asymmetric corners — a missing corner is the most common shorthand-expansion slip');
     }
+    // ---- Invariant 5, enforced: is every value expressible in Webflow's NATIVE style panel? ----
+    // A value the Designer has no field for is stored as a CUSTOM PROPERTY. It still emits CSS, so
+    // every pixel/property gate passes while the build is not native and the client cannot edit it.
+    for (const f of NATIVE.checkClass(c.name, p, { installedFonts: INSTALLED_FONTS })) {
+      (f.level === 'block' ? B : W)(f.rule, f.where, f.msg, f.fix);
+    }
     if (!BEM_RE.test(c.name)) W('class-naming', `class ${c.name}`, 'not BEM kebab-case',
       'block, block__element, block__element--modifier — keeps the registry dedupable');
   }
@@ -331,6 +349,9 @@ if (SELFTEST) {
       { name: 'hero__box', properties: { 'border-top-left-radius': '8px' } },           // partial-radius
       { name: 'Hero_Box', properties: { color: '#111' } },                              // class-naming
       { name: 'hero__slider-track', properties: {} },
+      // Invariant 5: values Webflow's native style panel cannot express -> they land in Custom Properties
+      { name: 'hero__leak', properties: { 'font-size': 'clamp(3rem, 9.6vw, 120px)', 'font-family': 'Inter, Arial, sans-serif', 'aspect-ratio': '4 / 5' } },
+      { name: 'hero__native', properties: { 'font-size': '120px', 'font-family': 'Inter', width: '100%', 'max-width': '331px' } },
     ],
     tree: {
       type: 'Section', styleNames: ['hero'], children: [
@@ -361,6 +382,8 @@ if (SELFTEST) {
     ['bare px width warned', w2.includes('bare-px-width')],
     ['partial radius warned', w2.includes('partial-radius')],
     ['non-BEM name warned', w2.includes('class-naming')],
+    ['custom-property leak blocked (clamp / font stack / aspect-ratio)', k2.filter(k => k === 'custom-property-leak').length === 3],
+    ['native px + single installed-family value stays clean', !k2.includes('font-not-on-site')],
   ];
   console.log('\nself-test:');
   console.log('  expected blocker kinds present: ' + (missing.length ? 'MISSING ' + missing.join(',') : 'all ' + want.join(', ')));

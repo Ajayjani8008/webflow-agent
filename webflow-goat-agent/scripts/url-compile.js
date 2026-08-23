@@ -221,6 +221,7 @@ function compile() {
   const src = argv.find(a => !a.startsWith('--')) || die('usage: node url-compile.js <extract.json> --prefix=<block>');
   const prefix = opt('prefix') || die('--prefix=<block> is required (derive it from the SITE id, never the source)');
   const font = opt('font');
+  const NATIVE_FONTS = new Set(); const NATIVE_DROPPED = [];
   const maxDepth = Number(opt('max-depth') || 99);
   const d = JSON.parse(fs.readFileSync(src, 'utf8'));
   const nodes = d.nodes || d.elements || [];
@@ -290,7 +291,15 @@ function compile() {
     for (const [k, v] of Object.entries(s2)) {
       if (!KEEP.has(k)) continue;
       if (v === undefined || v === null || v === '' || (v === 'auto' && !['top', 'right', 'bottom', 'left'].includes(k))) continue;
-      if (k === 'font-family' && font) { out[k] = font; continue }
+      // ---- Invariant 5: emit only what Webflow's NATIVE style panel can hold ----
+      // A CSS fallback stack or a clamp()/min()/max() value is stored by data_style_tool as a
+      // Designer CUSTOM PROPERTY: it emits CSS, passes every pixel gate, and is not native.
+      if (k === 'font-family') {
+        const fam = font || String(v).split(',')[0].replace(/["']/g, '').trim();
+        if (fam) { out[k] = fam; NATIVE_FONTS.add(fam) }
+        continue;
+      }
+      if (/(^|[^a-z0-9_-])(clamp|min|max|env)\s*\(/i.test(String(v))) { NATIVE_DROPPED.push(`${k}: ${v}`); continue }
       if (['width', 'height', 'min-height', 'flex-basis', 'max-width'].includes(k)) {
         const frac = /^\d+(\.\d+)?px$/.test(String(v)) && /\.\d/.test(String(v));
         const b = n.box || {};
@@ -549,6 +558,10 @@ function compile() {
   console.log(`  strings carried    ${strings.length}   <- replica coverage target; content-coverage.js enforces it`);
   console.log(`  media needing an asset  ${needsAsset}   (upload + bind by id; inline svg -> pre-flight per Rule 15)`);
   if (font) console.log(`  font substituted   every family -> ${font} (reference family is proprietary; deliberate, recorded)`);
+  // Invariant 5 report — the pipeline gates on these two lines, they are not decoration.
+  if (NATIVE_FONTS.size) console.log(`  fonts required     ${[...NATIVE_FONTS].join(', ')}  <- each must exist in Site Settings > Fonts BEFORE the build writes, or the face silently falls back and the section can never reach the pixel floor`);
+  if (NATIVE_DROPPED.length) console.log(`  non-native values   ${NATIVE_DROPPED.length} dropped (clamp/min/max/env cannot be held by a Webflow size field): ${NATIVE_DROPPED.slice(0, 4).join(' · ')}${NATIVE_DROPPED.length > 4 ? ' …' : ''}
+                      author these as a base value + real breakpoint overrides, each measured from the reference at that width`);
   console.log(`  plan     ${planOut}`);
   console.log(`  contract ${conOut}`);
   if (renames.length) { console.log(`  truthful renames (${renames.length}):`); renames.slice(0,4).forEach(r => console.log(`    · ${r}`)) }

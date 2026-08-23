@@ -7,6 +7,25 @@ description: Build a native Webflow CMS Collection List end to end via MCP — c
 
 Proven flow (partner-program `hc-articles`, 2026-07-12). **Decide first:** ≥3 same-structure repeats + editor-updated + per-item image/detail page → CMS. ≥2 repeats that are *not* editorial → `component-build` instead. One-off → static div-block. Getting this wrong costs a rebuild, so record the decision in the spec `elements:` row.
 
+## 0. Derive the collection FROM THE REFERENCE, before creating anything
+
+`node "$WF/scripts/wf-cms.js" plan <extract.json> --prefix=<block> [--min-repeat=3] [--out=<file>]`
+
+Returns the decision and, when it is CMS, the whole schema: how many items the reference carries, which
+slots VARY per item (those are fields, typed PlainText / RichText / Number / DateTime / Image / Link),
+which slots are identical in every item (those are **static chrome and must never become fields**), the
+per-element binding map with its exact setting key, the item payloads, and the image-upload count.
+
+Two guards it enforces, both from real failures:
+- **Ranked by content, never by repeat count.** A decorative grid out-repeats every editorial list — a
+  144-cell pixel mask beat a 5-row content list on a live reference and produced a zero-field plan that
+  still read READY. Groups whose items carry no text/src/href are rejected as scenery, and listed.
+- **Zero varying slots = not a collection.** Identical repeats are a component (`component-build`) or
+  decoration. The script returns NO-CMS with the reason instead of creating an empty collection.
+
+Capture the block itself (`.the-list-wrapper`), not the whole page: a page-wide extract hits the 800-node
+cap and decorative cells crowd the real rows out of the capture entirely.
+
 ## 1. Collection + fields
 
 1. `data_cms_tool > create_collection` → then `create_collection_static_field` per field (`create_collection_option_field` for enums, `create_collection_reference_field` for relations). Image field accepts `{url, alt}` at item-create — Webflow re-hosts it. Switch = boolean.
@@ -42,6 +61,23 @@ Proven flow (partner-program `hc-articles`, 2026-07-12). **Decide first:** ≥3 
 | Detail-page link | LinkBlock | `link` → collection page |
 
 Static labels inside the item (an eyebrow, a "Read more") → `set_settings` key `text` + `static_text.value`. Bound text always wins over static.
+
+## 4b. PROVE THE DATA RENDERS — the gate no pixel score can replace
+
+`node "$WF/scripts/wf-cms.js" verify <publishedUrl> "<selector>" [--expect-items=N]`
+
+Webflow marks its own data failures in the DOM, and nothing in this pack read them until v2.1.18:
+
+| Signal | Means | Usual cause |
+|---|---|---|
+| `.w-dyn-empty` visible | no items reached the list | items never published (drafts render empty live) · a filter excludes everything · `source` written as a plain string instead of `static_json {"collectionId":"…"}` |
+| `.w-dyn-bind-empty` | Webflow bound the element and got **nothing back** | the field is empty on those items · bound to the wrong field id · Image field bound to `assetId` while the item stores a URL |
+| item count ≠ expected | list is truncating | "Limit items" setting · draft/archived items · a list filter |
+| bound `<img>` with no `src` | asset never resolved | empty Image field · the S3 upload never completed |
+| `.w-condition-invisible` | a condition hid it | a Switch field is false/empty — fine when intended, confirm it is |
+
+**A CMS section is not done until this passes.** An empty bound heading is blank pixels: the section can
+score 99% with every item missing. Never "fix" a `.w-dyn-bind-empty` by hiding the element.
 
 ## 5. Hard limits (verified — design around them, don't fight them)
 

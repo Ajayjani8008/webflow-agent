@@ -1,0 +1,39 @@
+{
+ "_": "What Webflow's NATIVE style panel can express. data_style_tool accepts ANY css property/value, but anything outside this table is stored as a Designer CUSTOM PROPERTY, not a native control. A custom property still emits CSS, so every pixel gate can pass while the build is not actually Webflow-native: the client cannot edit it in the Designer's own fields, it does not participate in the breakpoint UI, and Invariant 5 is void. This file is the machine-checkable form of that invariant. It is SITE-AGNOSTIC: no site id, no client name, no project value belongs in here.",
+ "verifiedOn": "2026-08-23",
+ "evidence": "Live build, Run Rob Run page: `font-family: Inter, Arial, sans-serif` and `font-size: clamp(3rem, 9.6vw, 120px)` were written by data_style_tool, reported back by the API as ordinary base properties, and appeared in the Designer under Custom Properties. Both scored green on every existing gate. The user caught it by eye, which is exactly the class of defect the pack is supposed to make impossible.",
+
+ "valueFunctions": {
+  "block": ["clamp", "min", "max", "env"],
+  "why": "Webflow's size fields take a single value plus a unit from a fixed unit menu (px, %, em, rem, vw, vh, ch, svh, dvh). A CSS function is not a value the unit menu can round-trip, so the write lands in Custom Properties.",
+  "fix": "Author the value the way the Designer does: one number + one unit at the base breakpoint, then real breakpoint overrides for the other sizes. A fluid ramp that the reference expresses as clamp() becomes base + medium + small + tiny overrides, each measured from the reference AT that width - which is more accurate than a clamp curve anyway, because it is what the reference actually renders there.",
+  "warnOnly": ["calc", "var"],
+  "warnWhy": "calc() survives in some Webflow numeric fields and is genuinely needed for a few layout cases; raw var() is almost always a variable that should be bound through data_style_tool's variable_as_value instead. Both are warnings until a live probe promotes them - do not guess."
+ },
+
+ "propertyRules": {
+  "font-family": {
+   "singleFamilyOnly": true,
+   "why": "Webflow's font control is a picker over the families installed on the SITE. A comma-separated CSS stack is not a pickable family, so it lands in Custom Properties - and the fallback silently renders instead of the intended face, which is a pixel gap no score can attribute.",
+   "fix": "Write ONE family name, and it must already exist on the site (Site Settings > Fonts, or an uploaded custom font). If the reference's face is not installed, that is a BLOCKING handoff to the user, never a fallback stack: a substituted face changes every glyph advance in the section."
+  },
+  "font-weight": { "numericOnly": true, "why": "Webflow exposes the weights the installed family actually ships. A weight the family does not carry is synthesised by the browser and never matches the reference." },
+  "line-height": { "unitRequiredOrUnitless": true, "why": "Both forms are native; noted so the checker does not flag unitless values." }
+ },
+
+ "propertiesWithoutNativeControl": {
+  "block": ["aspect-ratio", "inset", "place-items", "place-content", "text-align-last", "hyphens", "text-wrap"],
+  "why": "No field exists for these in the Designer style panel, so every one of them lands in Custom Properties.",
+  "fix": "aspect-ratio -> set height in the same unit system the reference uses at each breakpoint, or a padding-top percentage box with the child absolutely positioned (both are native and both are what a Webflow studio ships). inset -> top/right/bottom/left longhands, which ARE native. place-items/place-content -> align-items + justify-items / align-content + justify-content. text-align-last / hyphens / text-wrap -> drop them: they are typographic polish the Designer cannot hold, and they must be logged as an impossible case rather than smuggled in as custom CSS."
+ },
+
+ "nativeUnits": ["px", "%", "em", "rem", "vw", "vh", "vmin", "vmax", "ch", "svh", "dvh", "svw", "dvw", "fr", "s", "ms", "deg", "auto", "none", "inherit", "initial", "unset"],
+
+ "notChecked": {
+  "_": "Properties deliberately NOT flagged, so the rule stays honest about what has actually been verified.",
+  "transform": "Webflow's transform panel covers translate/scale/rotate/skew natively.",
+  "transition-*": "native (Transitions panel), including cubic-bezier timing functions.",
+  "filter / backdrop-filter / mix-blend-mode": "native in the Effects panel on current Webflow.",
+  "grid-*": "native grid controls."
+ }
+}
