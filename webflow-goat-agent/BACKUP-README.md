@@ -4,7 +4,7 @@ Pixel-perfect, fully native Webflow builds from any reference — Figma · scree
 
 **DONE = visually indistinguishable from the reference at every breakpoint, every effect, every icon, every word — proved by tool output, not by claim.**
 
-**New user? Read `how-to-use.md` first** — commands, rules and quick answers on one page. This file is the install/restore manual.
+**New user? Start with `QUICK-START.md`** (5 minutes, everything you need to run the first build), then `HOW-TO-USE-AGENT.md` for the full manual. `how-to-use.md` is the in-chat cheat sheet — commands, rules and quick answers on one page. This file is the install/restore manual.
 
 ---
 
@@ -22,7 +22,7 @@ Pixel-perfect, fully native Webflow builds from any reference — Figma · scree
 | `docs-memory/*` | `~/docs/memory/webflow/` | `error_learnings.md` · `impossible_cases.md` · `v2-rationale.md` · `sites/_template/` (seed for a new site) · `sites/<site-id>/` per-site state. |
 | `rules/common-agents.md` | `~/.claude/rules/common/agents.md` | Cross-platform agent routing; the Webflow rows point here. |
 | `auto-memory/*` | `~/.claude/projects/<project-slug>/memory/` | Cross-session knowledge: MCP gotchas, SVG native path, CMS collection-list limits, pixel-match method, source-isolation policy. |
-| `how-to-use.md`, `CHANGELOG.md` | `~/docs/memory/webflow/` | Human-readable. Never loaded during a build. |
+| `QUICK-START.md`, `HOW-TO-USE-AGENT.md`, `how-to-use.md`, `CHANGELOG.md` | `~/docs/memory/webflow/` | Human-readable. Never loaded during a build. |
 
 `~/.claude/rules/webflow/` is **not** part of this pack any more — it was pure changelog and never loaded. History lives in `CHANGELOG.md`.
 

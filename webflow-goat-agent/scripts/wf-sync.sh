@@ -38,6 +38,8 @@ PAIRS=(
   "$MEM/error_learnings.md$TAB$REPO/docs-memory/error_learnings.md"
   "$MEM/impossible_cases.md$TAB$REPO/docs-memory/impossible_cases.md"
   "$MEM/how-to-use.md$TAB$REPO/how-to-use.md"
+  "$MEM/QUICK-START.md$TAB$REPO/QUICK-START.md"
+  "$MEM/HOW-TO-USE-AGENT.md$TAB$REPO/HOW-TO-USE-AGENT.md"
 )
 for s in "${SKILLS[@]}"; do PAIRS+=("$LIVE/skills/$s/SKILL.md$TAB$REPO/skills/$s/SKILL.md"); done
 # scripts/*.json carries DATA the scripts depend on (skeletons.json) — it must travel with the pack.
